@@ -1,10 +1,13 @@
+import base64
+import hashlib
 import os
+import re
 from pathlib import Path
 from typing import Optional
 
 from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel,
-    QLineEdit, QPushButton, QTextEdit, QFileDialog,
+    QLineEdit, QPushButton, QTextEdit, QFileDialog, QCheckBox,
 )
 from PyQt6.QtCore import QThread, pyqtSignal
 
@@ -24,29 +27,81 @@ def _is_valid_utf8(path: str) -> bool:
         return False
 
 
-def convert_to_markdown(input_path: str, output_path: str) -> None:
+_DATA_URI_RE = re.compile(r"data:image/([a-zA-Z0-9.+-]+);base64,([A-Za-z0-9+/=]+)")
+
+# mime-подтип → расширение файла, если они не совпадают
+_MIME_EXT = {"jpeg": "jpg", "svg+xml": "svg", "x-emf": "emf", "x-wmf": "wmf"}
+
+
+def extract_embedded_images(md_path: str) -> int:
+    """Декодирует base64-картинки из .md в папку <имя>_media.
+
+    Ссылки в файле заменяются на относительные. Одинаковые картинки
+    сохраняются один раз. Возвращает число извлечённых файлов.
+    """
+    p = Path(md_path)
+    text = p.read_text(encoding="utf-8")
+    media_dir = Path(str(p.with_suffix("")) + "_media")
+    saved: dict[str, str] = {}  # md5 → имя файла
+
+    def _replace(m: re.Match) -> str:
+        subtype, b64 = m.group(1), m.group(2)
+        try:
+            data = base64.b64decode(b64)
+        except Exception:
+            return m.group(0)
+        if not data:
+            return m.group(0)
+        digest = hashlib.md5(data).hexdigest()
+        if digest not in saved:
+            ext = _MIME_EXT.get(subtype, subtype)
+            name = f"image{len(saved) + 1}.{ext}"
+            media_dir.mkdir(exist_ok=True)
+            (media_dir / name).write_bytes(data)
+            saved[digest] = name
+        return f"{media_dir.name}/{saved[digest]}"
+
+    new_text = _DATA_URI_RE.sub(_replace, text)
+    if new_text != text:
+        p.write_text(new_text, encoding="utf-8")
+    return len(saved)
+
+
+def convert_to_markdown(input_path: str, output_path: str,
+                        extract_images: bool = False) -> int:
+    """Конвертирует файл в Markdown. Возвращает число извлечённых картинок."""
     from markitdown import MarkItDown, StreamInfo
     kwargs = {}
     ext = Path(input_path).suffix.lower()
     if ext in _TEXT_EXTENSIONS and _is_valid_utf8(input_path):
         kwargs["stream_info"] = StreamInfo(charset="utf-8")
+    if extract_images:
+        # иначе MarkItDown пишет обрезанный 'data:image/png;base64...'
+        kwargs["keep_data_uris"] = True
     result = MarkItDown().convert(input_path, **kwargs)
     with open(output_path, "w", encoding="utf-8") as f:
         f.write(result.text_content)
+    if extract_images:
+        return extract_embedded_images(output_path)
+    return 0
 
 
 class _ConvertWorker(QThread):
     log  = pyqtSignal(str)
     done = pyqtSignal(bool)
 
-    def __init__(self, input_path: str, output_path: str) -> None:
+    def __init__(self, input_path: str, output_path: str, extract_images: bool) -> None:
         super().__init__()
-        self._input  = input_path
-        self._output = output_path
+        self._input   = input_path
+        self._output  = output_path
+        self._extract = extract_images
 
     def run(self) -> None:
         try:
-            convert_to_markdown(self._input, self._output)
+            count = convert_to_markdown(self._input, self._output, self._extract)
+            if count:
+                media = str(Path(self._output).with_suffix("")) + "_media"
+                self.log.emit(f"ℹ Извлечено изображений: {count} → {media}")
             self.log.emit(f"✓ Готово → {self._output}")
             self.done.emit(True)
         except Exception as e:
@@ -90,6 +145,11 @@ class MarkItDownTab(QWidget):
         row_out.addWidget(self._output_edit)
         row_out.addWidget(btn_out)
         layout.addLayout(row_out)
+
+        # Извлечение картинок
+        self._extract_chk = QCheckBox("Извлекать изображения в папку рядом с файлом")
+        self._extract_chk.setChecked(True)
+        layout.addWidget(self._extract_chk)
 
         # Кнопка конвертации
         self._convert_btn = QPushButton("Конвертировать")
@@ -149,7 +209,9 @@ class MarkItDownTab(QWidget):
         self._convert_btn.setEnabled(False)
         self._log.append(f"▶ Конвертация: {input_path}")
 
-        self._worker = _ConvertWorker(input_path, output_path)
+        self._worker = _ConvertWorker(
+            input_path, output_path, self._extract_chk.isChecked()
+        )
         self._worker.log.connect(self._log.append)
         self._worker.done.connect(self._on_done)
         self._worker.start()

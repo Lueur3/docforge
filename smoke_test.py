@@ -166,7 +166,20 @@ def t_images_md():
     assert os.path.isdir(media), "папка с медиа не создана"
 check("Pandoc: docx → md, картинки с относительными путями", t_images_md)
 
-# 10. ffmpeg-статус (информационно)
+# 10. MarkItDown: извлечение встроенных изображений из docx
+def t_markitdown_images():
+    docx = os.path.join(tmp, "img.docx")  # создан тестом выше
+    out = os.path.join(tmp, "mid_img.md")
+    count = convert_to_markdown(docx, out, extract_images=True)
+    assert count >= 1, f"картинки не извлечены (count={count})"
+    media = os.path.splitext(out)[0] + "_media"
+    assert os.path.isdir(media) and os.listdir(media), "папка с картинками пуста"
+    text = open(out, encoding="utf-8").read()
+    assert "data:image" not in text, "в md остался base64"
+    assert "mid_img_media/" in text, "нет относительной ссылки на картинку"
+check("MarkItDown: извлечение изображений из docx", t_markitdown_images)
+
+# 11. ffmpeg-статус (информационно)
 def t_ffmpeg():
     import ffmpeg_helper
     path = ffmpeg_helper.find_ffmpeg()
