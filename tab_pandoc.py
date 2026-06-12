@@ -56,6 +56,7 @@ class _ConvertWorker(QThread):
                     self.done.emit(False)
                     return
                 self.log.emit(f"▶ PDF-движок: {engine}")
+                pdf_helper.ensure_autoinstall(engine)
                 extra.append(f"--pdf-engine={engine}")
                 if pdf_helper.is_unicode_engine(engine):
                     # системный шрифт с поддержкой кириллицы

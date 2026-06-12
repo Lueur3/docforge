@@ -5,6 +5,9 @@ from typing import Optional
 
 from PyQt6.QtCore import QThread, pyqtSignal
 
+# не показывать окно консоли при запуске из pythonw (GUI без терминала)
+_NO_WINDOW = subprocess.CREATE_NO_WINDOW if sys.platform == "win32" else 0
+
 
 def find_ffmpeg() -> Optional[str]:
     """Ищет ffmpeg: сначала в системном PATH, потом в imageio-ffmpeg."""
@@ -36,6 +39,7 @@ class FfmpegInstallWorker(QThread):
                 [sys.executable, "-m", "pip", "install", "imageio-ffmpeg", "--quiet"],
                 stdout=subprocess.DEVNULL,
                 stderr=subprocess.DEVNULL,
+                creationflags=_NO_WINDOW,
             )
         except subprocess.CalledProcessError as e:
             self.done.emit(False, f"pip install завершился с ошибкой: {e}")

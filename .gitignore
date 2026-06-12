@@ -10,3 +10,7 @@ build/
 *.egg-info/
 .idea/
 .vscode/
+
+# скачанные установщики
+*.msi
+*.exe

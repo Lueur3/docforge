@@ -16,6 +16,9 @@ Converts any supported file to Markdown using Microsoft's MarkItDown library.
 Supported input: Word, PDF, Excel, PowerPoint, HTML, images (with OCR), and more.
 
 - Output path is suggested automatically (same directory, `.md` extension)
+- **Extract images** (optional, on by default): MarkItDown embeds images as base64;
+  this option decodes them into an `<output>_media` folder and rewrites links to
+  relative paths, so the Markdown renders with images in any viewer
 - Optional audio/video support via ffmpeg — one-click install inside the app
 
 ### Pandoc tab
@@ -43,15 +46,17 @@ Full bidirectional conversion between document formats via Pandoc.
 - Dark theme
 - UTF-8 throughout — Cyrillic and other non-Latin text works out of the box
 - Conversion runs in a background thread — UI stays responsive
-- MarkItDown and Pandoc are installed automatically on first launch
+- On first launch a setup window installs MarkItDown and Pandoc automatically and
+  lets you opt into the optional components
 
 ---
 
 ## Requirements
 
-- Python 3.10 or newer
-- Internet connection on first launch (downloads Pandoc binary automatically)
-- For PDF output: a LaTeX engine, e.g. [MiKTeX](https://miktex.org/) (Windows) or TeX Live (Linux/macOS)
+- Windows 10 or 11
+- Python 3.10 or newer ([python.org](https://www.python.org/downloads/), tick "Add Python to PATH")
+- Internet connection on first launch (downloads the Pandoc binary automatically)
+- PDF output additionally needs MiKTeX — the setup window can install it for you
 
 ---
 
@@ -67,20 +72,32 @@ python main.py
 After that, just double-click **DocForge.bat** — it launches the app without a console window
 (via `pythonw`). If the app fails to start, run **DocForge-debug.bat** to see the error.
 
-On the first launch, a setup window lists every component with its download source;
-MarkItDown and Pandoc are installed automatically, optional ones can be toggled off.
+On the first launch, a setup window lists every component with its download source.
+MarkItDown and Pandoc (required core) are installed automatically; the optional
+components — ffmpeg and MiKTeX — have toggles you can switch off.
 
 ---
 
-## Optional: ffmpeg
+## Optional components
 
-ffmpeg enables conversion of audio and video files in the MarkItDown tab
+### ffmpeg — audio and video
+
+Enables converting audio and video files in the MarkItDown tab
 (e.g. extracting transcripts from `.mp3`, `.mp4`, `.wav`).
 
-**To install:** click the **Install ffmpeg** button in the MarkItDown tab.
-The app uses [imageio-ffmpeg](https://github.com/imageio/imageio-ffmpeg) — no manual download needed.
+Installed from the setup window, or any time later via the **Install ffmpeg** button
+in the MarkItDown tab. The app uses [imageio-ffmpeg](https://github.com/imageio/imageio-ffmpeg)
+— no manual download needed. If ffmpeg is already in your system PATH, it is detected automatically.
 
-If ffmpeg is already present in your system PATH, it will be detected automatically.
+### MiKTeX — PDF output
+
+Required only for the **PDF** output format in the Pandoc tab. The setup window installs it
+via `winget`; you can also install it manually from [miktex.org](https://miktex.org/).
+
+The app prefers the `xelatex` engine (handles Cyrillic) and enables MiKTeX's
+on-the-fly package installation automatically, so the first PDF build pulls any
+missing LaTeX packages without prompting. The first PDF conversion may therefore
+take a minute while those packages download.
 
 ---
 
@@ -90,7 +107,8 @@ If ffmpeg is already present in your system PATH, it will be detected automatica
 
 1. Click **Browse** and select an input file
 2. The output path is filled in automatically
-3. Adjust the output path if needed
+3. Leave **Extract images** on to save embedded images next to the Markdown, or turn it
+   off for text only (useful when the Markdown is meant for an LLM)
 4. Click **Convert**
 
 **Pandoc tab**

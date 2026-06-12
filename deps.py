@@ -15,6 +15,9 @@ import pdf_helper
 
 _MARKER = Path(os.getenv("APPDATA", str(Path.home()))) / "DocForge" / "setup_done"
 
+# не показывать окно консоли при запуске из pythonw (GUI без терминала)
+_NO_WINDOW = subprocess.CREATE_NO_WINDOW if sys.platform == "win32" else 0
+
 
 def _markitdown_installed() -> bool:
     try:
@@ -48,6 +51,7 @@ class _SetupWorker(QThread):
             [sys.executable, "-m", "pip", "install", "--quiet", package],
             stdout=subprocess.DEVNULL,
             stderr=subprocess.DEVNULL,
+            creationflags=_NO_WINDOW,
         )
 
     def run(self) -> None:
@@ -78,7 +82,13 @@ class _SetupWorker(QThread):
                      "--accept-package-agreements", "--accept-source-agreements"],
                     stdout=subprocess.DEVNULL,
                     stderr=subprocess.DEVNULL,
+                    creationflags=_NO_WINDOW,
                 )
+                # включаем автоустановку LaTeX-пакетов, иначе первая
+                # сборка PDF падает на неинтерактивном запросе пакета
+                engine = pdf_helper.find_pdf_engine()
+                if engine:
+                    pdf_helper.ensure_autoinstall(engine)
         except Exception as e:
             self.done.emit(False, str(e))
             return
