@@ -8,6 +8,8 @@ from PyQt6.QtWidgets import (
 )
 from PyQt6.QtCore import QThread, pyqtSignal
 
+import pdf_helper
+
 
 # Форматы: (отображаемое имя, writer для pandoc, расширение, флаг --standalone)
 # Pandoc всегда читает и пишет UTF-8 — отдельные флаги кодировки не нужны.
@@ -41,6 +43,30 @@ class _ConvertWorker(QThread):
             import pypandoc
 
             extra = ["--standalone"] if self._standalone else []
+
+            if self._writer == "pdf":
+                engine = pdf_helper.find_pdf_engine()
+                if engine is None:
+                    self.log.emit("✗ Для вывода в PDF нужен LaTeX-движок.")
+                    self.log.emit(
+                        "ℹ Установите MiKTeX (https://miktex.org) — "
+                        "приложение найдёт его автоматически."
+                    )
+                    self.done.emit(False)
+                    return
+                self.log.emit(f"▶ PDF-движок: {engine}")
+                extra.append(f"--pdf-engine={engine}")
+                if pdf_helper.is_unicode_engine(engine):
+                    # системный шрифт с поддержкой кириллицы
+                    extra += ["-V", "mainfont=Segoe UI"]
+            elif self._writer == "html":
+                # картинки из docx/odt/epub встраиваются прямо в html
+                extra.append("--embed-resources")
+            elif self._writer in ("markdown", "rst", "latex"):
+                # картинки извлекаются в папку рядом с выходным файлом
+                media_dir = str(Path(self._output).with_suffix("")) + "_media"
+                extra.append(f"--extract-media={media_dir}")
+
             pypandoc.convert_file(
                 self._input,
                 self._writer,
@@ -52,10 +78,11 @@ class _ConvertWorker(QThread):
         except Exception as e:
             error_msg = str(e)
             self.log.emit(f"✗ Ошибка: {error_msg}")
-            if "pdflatex" in error_msg or "pdf-engine" in error_msg:
+            if self._writer == "pdf" and "package" in error_msg.lower():
                 self.log.emit(
-                    "ℹ Для вывода в PDF нужен LaTeX-движок. "
-                    "Установите MiKTeX (https://miktex.org) и повторите попытку."
+                    "ℹ Похоже, MiKTeX не хватает LaTeX-пакетов. Откройте MiKTeX Console → "
+                    "Settings → установите 'Always install missing packages on-the-fly' "
+                    "и повторите попытку."
                 )
             self.done.emit(False)
 

@@ -1,5 +1,10 @@
 import sys
 import os
+import warnings
+
+# pydub предупреждает об отсутствии ffmpeg в PATH при импорте — до того,
+# как мы укажем ему путь через configure_pydub. Предупреждение ложное.
+warnings.filterwarnings("ignore", message="Couldn't find ffmpeg or avconv")
 
 # Форсируем UTF-8 до любых других импортов
 os.environ["PYTHONUTF8"] = "1"

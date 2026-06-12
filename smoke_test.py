@@ -69,19 +69,23 @@ for label, writer, ext, standalone in FORMATS:
         continue
     check(f"Pandoc: md → .{ext} ({label})", make_pandoc_test(writer, ext, standalone))
 
-# 4. Pandoc: PDF (требует LaTeX — допустимо отсутствие)
+# 4. Pandoc: PDF (та же логика, что в _ConvertWorker)
 def t_pdf():
-    import pypandoc, shutil
-    if not (shutil.which("pdflatex") or shutil.which("xelatex") or shutil.which("tectonic")):
-        results.append((SKIP, "Pandoc: md → .pdf — LaTeX-движок не установлен (ожидаемо)"))
+    import pypandoc
+    import pdf_helper
+    engine = pdf_helper.find_pdf_engine()
+    if engine is None:
+        results.append((SKIP, "Pandoc: md → .pdf — LaTeX-движок не установлен"))
         return
     out = os.path.join(tmp, "out.pdf")
-    pypandoc.convert_file(src_md, "pdf", outputfile=out)
+    extra = [f"--pdf-engine={engine}"]
+    if pdf_helper.is_unicode_engine(engine):
+        extra += ["-V", "mainfont=Segoe UI"]
+    pypandoc.convert_file(src_md, "pdf", outputfile=out, extra_args=extra)
     assert os.path.getsize(out) > 0
+    results.append((PASS, f"Pandoc: md → .pdf (движок: {os.path.basename(engine)})"))
 try:
     t_pdf()
-    if not any("pdf" in r[1] for r in results):
-        results.append((PASS, "Pandoc: md → .pdf"))
 except Exception as e:
     results.append((FAIL, f"Pandoc: md → .pdf — {e}"))
 
@@ -115,7 +119,31 @@ def t_markitdown_html():
         assert MARKER in f.read(), "кириллица потеряна (html)"
 check("MarkItDown: html → md с кириллицей", t_markitdown_html)
 
-# 8. ffmpeg-статус (информационно)
+# 8. Pandoc: картинки из docx попадают в html (--embed-resources)
+def t_images_html():
+    import pypandoc
+    # делаем docx с картинкой: png 1x1 + md со ссылкой на неё
+    png = os.path.join(tmp, "pix.png")
+    with open(png, "wb") as f:
+        f.write(bytes.fromhex(
+            "89504e470d0a1a0a0000000d4948445200000001000000010802000000907753"
+            "de000000124944415408d763f8cfc000000301010018dd8db00000000049454e"
+            "44ae426082"
+        ))
+    md_img = os.path.join(tmp, "с картинкой.md")
+    with open(md_img, "w", encoding="utf-8") as f:
+        f.write(f"# Картинка\n\n![тест]({png})\n")
+    docx = os.path.join(tmp, "img.docx")
+    pypandoc.convert_file(md_img, "docx", outputfile=docx)
+    # docx → html как делает вкладка Pandoc
+    html = os.path.join(tmp, "img.html")
+    pypandoc.convert_file(docx, "html", outputfile=html,
+                          extra_args=["--standalone", "--embed-resources"])
+    with open(html, encoding="utf-8") as f:
+        assert "data:image" in f.read(), "картинка не встроена в html"
+check("Pandoc: картинка из docx встроена в html", t_images_html)
+
+# 9. ffmpeg-статус (информационно)
 def t_ffmpeg():
     import ffmpeg_helper
     path = ffmpeg_helper.find_ffmpeg()
