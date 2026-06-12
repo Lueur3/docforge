@@ -69,8 +69,8 @@ pip install -r requirements.txt
 python main.py
 ```
 
-After that, just double-click **DocForge.bat** — it launches the app without a console window
-(via `pythonw`). If the app fails to start, run **DocForge-debug.bat** to see the error.
+After that, launch the app by double-clicking **DocForge.bat**.
+If the app fails to start, run **DocForge-debug.bat** to see the error message.
 
 On the first launch, a setup window lists every component with its download source.
 MarkItDown and Pandoc (required core) are installed automatically; the optional

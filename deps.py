@@ -1,3 +1,4 @@
+import importlib.util
 import os
 import shutil
 import subprocess
@@ -19,15 +20,27 @@ _MARKER = Path(os.getenv("APPDATA", str(Path.home()))) / "DocForge" / "setup_don
 _NO_WINDOW = subprocess.CREATE_NO_WINDOW if sys.platform == "win32" else 0
 
 
-def _markitdown_installed() -> bool:
+def _module_present(name: str) -> bool:
+    """Проверяет установку пакета без его импорта.
+
+    import markitdown тянет onnxruntime/magika и занимает ~1.5 с —
+    недопустимо на старте. find_spec проверяет наличие за доли миллисекунды.
+    """
     try:
-        import markitdown  # noqa: F401
-        return True
-    except ImportError:
+        return importlib.util.find_spec(name) is not None
+    except (ImportError, ValueError):
         return False
 
 
+def _markitdown_installed() -> bool:
+    return _module_present("markitdown")
+
+
 def _pandoc_installed() -> bool:
+    """Полная проверка: пакет pypandoc + доступный бинарник Pandoc.
+
+    Вызывает Pandoc как процесс, поэтому используется только в окне
+    настройки, а не на быстром старте."""
     try:
         import pypandoc
         pypandoc.get_pandoc_version()
@@ -210,7 +223,11 @@ class SetupDialog(QDialog):
 
 
 def ensure_dependencies(_app: QApplication) -> None:
-    """Показывает окно настройки при первом запуске или если ядро не установлено."""
-    if _MARKER.exists() and _markitdown_installed() and _pandoc_installed():
+    """Показывает окно настройки при первом запуске или если ядро не установлено.
+
+    Быстрый путь не импортирует markitdown и не запускает Pandoc: маркер
+    пишется только после успешной установки, поэтому наличия пакетов
+    достаточно. Тяжёлые проверки — внутри SetupDialog."""
+    if _MARKER.exists() and _module_present("markitdown") and _module_present("pypandoc"):
         return
     SetupDialog().exec()
