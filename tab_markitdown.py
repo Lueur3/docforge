@@ -6,7 +6,9 @@ from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel,
     QLineEdit, QPushButton, QTextEdit, QFileDialog,
 )
-from PyQt6.QtCore import Qt, QThread, pyqtSignal
+from PyQt6.QtCore import QThread, pyqtSignal
+
+import ffmpeg_helper
 
 
 class _ConvertWorker(QThread):
@@ -36,7 +38,9 @@ class MarkItDownTab(QWidget):
     def __init__(self) -> None:
         super().__init__()
         self._worker: Optional[_ConvertWorker] = None
+        self._ffmpeg_worker: Optional[ffmpeg_helper.FfmpegInstallWorker] = None
         self._build_ui()
+        self._refresh_ffmpeg_status()
 
     def _build_ui(self) -> None:
         layout = QVBoxLayout(self)
@@ -74,12 +78,26 @@ class MarkItDownTab(QWidget):
         self._convert_btn.clicked.connect(self._run_convert)
         layout.addWidget(self._convert_btn)
 
+        # Статус ffmpeg
+        ffmpeg_row = QHBoxLayout()
+        ffmpeg_row.setSpacing(8)
+        self._ffmpeg_label = QLabel()
+        self._ffmpeg_install_btn = QPushButton("Установить ffmpeg")
+        self._ffmpeg_install_btn.setFixedWidth(150)
+        self._ffmpeg_install_btn.clicked.connect(self._install_ffmpeg)
+        ffmpeg_row.addWidget(self._ffmpeg_label)
+        ffmpeg_row.addWidget(self._ffmpeg_install_btn)
+        ffmpeg_row.addStretch()
+        layout.addLayout(ffmpeg_row)
+
         # Лог
         layout.addWidget(QLabel("Лог:"))
         self._log = QTextEdit()
         self._log.setReadOnly(True)
         self._log.setMinimumHeight(100)
         layout.addWidget(self._log)
+
+    # ------------------------------------------------------------------
 
     def _browse_input(self) -> None:
         path, _ = QFileDialog.getOpenFileName(self, "Выбрать файл")
@@ -118,3 +136,40 @@ class MarkItDownTab(QWidget):
 
     def _on_done(self, _success: bool) -> None:
         self._convert_btn.setEnabled(True)
+
+    # ------------------------------------------------------------------
+
+    def _refresh_ffmpeg_status(self) -> None:
+        path = ffmpeg_helper.find_ffmpeg()
+        if path:
+            ffmpeg_helper.configure_pydub(path)
+            self._ffmpeg_label.setText("ffmpeg: ✓  доступен  (аудио/видео поддерживаются)")
+            self._ffmpeg_label.setStyleSheet("color: #5cb85c; font-size: 11px;")
+            self._ffmpeg_install_btn.setVisible(False)
+        else:
+            self._ffmpeg_label.setText("ffmpeg: не найден  (аудио/видео недоступны)")
+            self._ffmpeg_label.setStyleSheet("color: #c8a050; font-size: 11px;")
+            self._ffmpeg_install_btn.setVisible(True)
+            self._ffmpeg_install_btn.setEnabled(True)
+            self._ffmpeg_install_btn.setText("Установить ffmpeg")
+
+    def _install_ffmpeg(self) -> None:
+        self._ffmpeg_install_btn.setEnabled(False)
+        self._ffmpeg_install_btn.setText("Установка...")
+        self._log.append("▶ Установка ffmpeg...")
+
+        self._ffmpeg_worker = ffmpeg_helper.FfmpegInstallWorker()
+        self._ffmpeg_worker.done.connect(self._on_ffmpeg_installed)
+        self._ffmpeg_worker.start()
+
+    def _on_ffmpeg_installed(self, success: bool, path_or_error: str) -> None:
+        if success:
+            self._log.append(f"✓ ffmpeg установлен: {path_or_error}")
+            self._ffmpeg_label.setText("ffmpeg: ✓  доступен  (аудио/видео поддерживаются)")
+            self._ffmpeg_label.setStyleSheet("color: #5cb85c; font-size: 11px;")
+            self._ffmpeg_install_btn.setVisible(False)
+            ffmpeg_helper.configure_pydub(path_or_error)
+        else:
+            self._log.append(f"✗ Ошибка установки ffmpeg: {path_or_error}")
+            self._ffmpeg_install_btn.setEnabled(True)
+            self._ffmpeg_install_btn.setText("Установить ffmpeg")

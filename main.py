@@ -77,6 +77,12 @@ def main() -> None:
     _apply_dark_theme(app)
     ensure_dependencies(app)
 
+    # Настраиваем pydub если ffmpeg уже установлен
+    from ffmpeg_helper import find_ffmpeg, configure_pydub
+    ffmpeg_path = find_ffmpeg()
+    if ffmpeg_path:
+        configure_pydub(ffmpeg_path)
+
     window = MainWindow()
     window.show()
     sys.exit(app.exec())
