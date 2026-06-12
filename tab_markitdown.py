@@ -124,8 +124,8 @@ class MarkItDownTab(QWidget):
         if not path:
             return
         self._input_edit.setText(path)
-        if not self._output_edit.text():
-            self._output_edit.setText(str(Path(path).with_suffix(".md")))
+        # путь вывода всегда следует за новым входным файлом
+        self._output_edit.setText(str(Path(path).with_suffix(".md")))
 
     def _browse_output(self) -> None:
         initial = self._output_edit.text() or str(Path.home())

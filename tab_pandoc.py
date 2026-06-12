@@ -192,10 +192,8 @@ class PandocTab(QWidget):
         if not path:
             return
         self._input_edit.setText(path)
-        if not self._output_edit.text():
-            ext = self._current_ext()
-            out = Path(path).with_suffix(f".{ext}")
-            self._output_edit.setText(str(out))
+        # путь вывода всегда следует за новым входным файлом
+        self._output_edit.setText(str(Path(path).with_suffix(f".{self._current_ext()}")))
 
     def _browse_output(self) -> None:
         ext = self._current_ext()
