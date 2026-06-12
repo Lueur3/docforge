@@ -10,6 +10,30 @@ from PyQt6.QtCore import QThread, pyqtSignal
 
 import ffmpeg_helper
 
+# Текстовые форматы, для которых автоопределение кодировки может ошибаться
+# (charset-normalizer на системах с не-латинской локалью путает UTF-8 с cp125x)
+_TEXT_EXTENSIONS = {".html", ".htm", ".txt", ".md", ".csv", ".json", ".xml"}
+
+
+def _is_valid_utf8(path: str) -> bool:
+    try:
+        with open(path, "rb") as f:
+            f.read().decode("utf-8")
+        return True
+    except (UnicodeDecodeError, OSError):
+        return False
+
+
+def convert_to_markdown(input_path: str, output_path: str) -> None:
+    from markitdown import MarkItDown, StreamInfo
+    kwargs = {}
+    ext = Path(input_path).suffix.lower()
+    if ext in _TEXT_EXTENSIONS and _is_valid_utf8(input_path):
+        kwargs["stream_info"] = StreamInfo(charset="utf-8")
+    result = MarkItDown().convert(input_path, **kwargs)
+    with open(output_path, "w", encoding="utf-8") as f:
+        f.write(result.text_content)
+
 
 class _ConvertWorker(QThread):
     log  = pyqtSignal(str)
@@ -22,11 +46,7 @@ class _ConvertWorker(QThread):
 
     def run(self) -> None:
         try:
-            from markitdown import MarkItDown
-            md = MarkItDown()
-            result = md.convert(self._input)
-            with open(self._output, "w", encoding="utf-8") as f:
-                f.write(result.text_content)
+            convert_to_markdown(self._input, self._output)
             self.log.emit(f"✓ Готово → {self._output}")
             self.done.emit(True)
         except Exception as e:
