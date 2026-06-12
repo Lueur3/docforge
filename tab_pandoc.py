@@ -1,4 +1,5 @@
 import os
+import urllib.parse
 from pathlib import Path
 from typing import Optional
 
@@ -62,17 +63,29 @@ class _ConvertWorker(QThread):
             elif self._writer == "html":
                 # картинки из docx/odt/epub встраиваются прямо в html
                 extra.append("--embed-resources")
-            elif self._writer in ("markdown", "rst", "latex"):
+            media_dir: Optional[str] = None
+            if self._writer in ("markdown", "rst", "latex"):
                 # картинки извлекаются в папку рядом с выходным файлом
                 media_dir = str(Path(self._output).with_suffix("")) + "_media"
                 extra.append(f"--extract-media={media_dir}")
 
+            writer = self._writer
+            if writer == "markdown":
+                # без pandoc-атрибутов {width=...} и без raw-HTML <img> —
+                # иначе картинки не рендерятся в VS Code, GitHub, Obsidian
+                writer = "markdown-link_attributes-raw_html"
+
             pypandoc.convert_file(
                 self._input,
-                self._writer,
+                writer,
                 outputfile=self._output,
                 extra_args=extra,
             )
+
+            if media_dir and os.path.isdir(media_dir):
+                self._relativize_media_paths(media_dir)
+                self.log.emit(f"ℹ Картинки извлечены в: {media_dir}")
+
             self.log.emit(f"✓ Готово → {self._output}")
             self.done.emit(True)
         except Exception as e:
@@ -85,6 +98,27 @@ class _ConvertWorker(QThread):
                     "и повторите попытку."
                 )
             self.done.emit(False)
+
+    def _relativize_media_paths(self, media_dir: str) -> None:
+        """Заменяет абсолютные пути к картинкам на относительные.
+
+        Pandoc записывает в --extract-media абсолютный путь как есть,
+        из-за чего ссылки не работают при переносе файла и не рендерятся
+        в большинстве просмотрщиков.
+        """
+        out = Path(self._output)
+        try:
+            text = out.read_text(encoding="utf-8")
+        except (OSError, UnicodeDecodeError):
+            return
+        rel = os.path.basename(media_dir)
+        fwd = media_dir.replace("\\", "/")
+        variants = {media_dir, fwd, urllib.parse.quote(fwd, safe=":/")}
+        new_text = text
+        for v in variants:
+            new_text = new_text.replace(v, rel)
+        if new_text != text:
+            out.write_text(new_text, encoding="utf-8")
 
 
 class PandocTab(QWidget):

@@ -143,7 +143,30 @@ def t_images_html():
         assert "data:image" in f.read(), "картинка не встроена в html"
 check("Pandoc: картинка из docx встроена в html", t_images_html)
 
-# 9. ffmpeg-статус (информационно)
+# 9. Pandoc: docx → md с картинкой — пути относительные, без {width=...}
+def t_images_md():
+    import pypandoc
+    docx = os.path.join(tmp, "img.docx")  # создан тестом выше
+    out = os.path.join(tmp, "img_out.md")
+    media = os.path.splitext(out)[0] + "_media"
+    pypandoc.convert_file(docx, "markdown-link_attributes-raw_html", outputfile=out,
+                          extra_args=[f"--extract-media={media}"])
+    # та же пост-обработка, что в _ConvertWorker._relativize_media_paths
+    import urllib.parse
+    text = open(out, encoding="utf-8").read()
+    rel = os.path.basename(media)
+    fwd = media.replace("\\", "/")
+    for v in {media, fwd, urllib.parse.quote(fwd, safe=":/")}:
+        text = text.replace(v, rel)
+    with open(out, "w", encoding="utf-8") as f:
+        f.write(text)
+    assert "![" in text, "ссылка на картинку отсутствует"
+    assert tmp not in text, "остался абсолютный путь"
+    assert "{width" not in text, "остались pandoc-атрибуты"
+    assert os.path.isdir(media), "папка с медиа не создана"
+check("Pandoc: docx → md, картинки с относительными путями", t_images_md)
+
+# 10. ffmpeg-статус (информационно)
 def t_ffmpeg():
     import ffmpeg_helper
     path = ffmpeg_helper.find_ffmpeg()
