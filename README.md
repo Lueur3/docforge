@@ -64,8 +64,11 @@ pip install -r requirements.txt
 python main.py
 ```
 
-On the first launch, MarkItDown and Pandoc are downloaded and configured automatically.
-No manual installation of external tools is required.
+After that, just double-click **DocForge.bat** — it launches the app without a console window
+(via `pythonw`). If the app fails to start, run **DocForge-debug.bat** to see the error.
+
+On the first launch, a setup window lists every component with its download source;
+MarkItDown and Pandoc are installed automatically, optional ones can be toggled off.
 
 ---
 
