@@ -13,8 +13,10 @@ if hasattr(sys.stdout, "reconfigure"):
 if hasattr(sys.stderr, "reconfigure"):
     sys.stderr.reconfigure(encoding="utf-8")
 
+from pathlib import Path
+
 from PyQt6.QtWidgets import QApplication
-from PyQt6.QtGui import QPalette, QColor
+from PyQt6.QtGui import QPalette, QColor, QIcon
 
 from deps import ensure_dependencies
 from window import MainWindow
@@ -76,8 +78,17 @@ def _apply_dark_theme(app: QApplication) -> None:
 
 
 def main() -> None:
+    # без этого Windows показывает в панели задач иконку Python, а не приложения
+    if sys.platform == "win32":
+        import ctypes
+        ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID("DocForge")
+
     app = QApplication(sys.argv)
     app.setApplicationName("DocForge")
+
+    icon_path = Path(__file__).parent / "images" / "app.ico"
+    if icon_path.is_file():
+        app.setWindowIcon(QIcon(str(icon_path)))
 
     _apply_dark_theme(app)
     ensure_dependencies(app)
