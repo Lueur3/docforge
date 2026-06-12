@@ -9,73 +9,54 @@ from PyQt6.QtWidgets import (
 from PyQt6.QtCore import QThread, pyqtSignal
 
 
-# Форматы: (отображаемое имя, расширение, флаг --standalone)
-FORMATS: list[tuple[str, str, bool]] = [
-    ("Markdown",         "md",   False),
-    ("HTML",             "html", True),
-    ("Word Document",    "docx", False),
-    ("EPUB",             "epub", True),
-    ("reStructuredText", "rst",  False),
-    ("Plain Text",       "txt",  False),
-    ("LaTeX",            "tex",  True),
-    ("ODT",              "odt",  False),
-    ("RTF",              "rtf",  False),
-    ("PDF",              "pdf",  False),
+# Форматы: (отображаемое имя, writer для pandoc, расширение, флаг --standalone)
+# Pandoc всегда читает и пишет UTF-8 — отдельные флаги кодировки не нужны.
+FORMATS: list[tuple[str, str, str, bool]] = [
+    ("Markdown",         "markdown", "md",   False),
+    ("HTML",             "html",     "html", True),
+    ("Word Document",    "docx",     "docx", False),
+    ("EPUB",             "epub",     "epub", True),
+    ("reStructuredText", "rst",      "rst",  False),
+    ("Plain Text",       "plain",    "txt",  False),
+    ("LaTeX",            "latex",    "tex",  True),
+    ("ODT",              "odt",      "odt",  False),
+    ("RTF",              "rtf",      "rtf",  True),
+    ("PDF",              "pdf",      "pdf",  False),
 ]
-
-# Текстовые форматы — добавляем --output-encoding=utf-8
-_TEXT_FORMATS = {"md", "html", "rst", "txt", "tex", "rtf"}
 
 
 class _ConvertWorker(QThread):
     log  = pyqtSignal(str)
     done = pyqtSignal(bool)
 
-    def __init__(self, input_path: str, output_path: str, fmt: str, standalone: bool) -> None:
+    def __init__(self, input_path: str, output_path: str, writer: str, standalone: bool) -> None:
         super().__init__()
         self._input      = input_path
         self._output     = output_path
-        self._fmt        = fmt
+        self._writer     = writer
         self._standalone = standalone
 
     def run(self) -> None:
         try:
             import pypandoc
 
-            extra: list[str] = []
-            if self._standalone:
-                extra.append("--standalone")
-            if self._fmt in _TEXT_FORMATS:
-                extra.append("--output-encoding=utf-8")
-
+            extra = ["--standalone"] if self._standalone else []
             pypandoc.convert_file(
                 self._input,
-                self._fmt,
+                self._writer,
                 outputfile=self._output,
                 extra_args=extra,
-                encoding="utf-8",
             )
             self.log.emit(f"✓ Готово → {self._output}")
             self.done.emit(True)
         except Exception as e:
             error_msg = str(e)
-            # --output-encoding не поддерживается старым Pandoc — повторяем без него
-            if "--output-encoding" in error_msg and "--output-encoding=utf-8" in extra:
-                try:
-                    extra.remove("--output-encoding=utf-8")
-                    pypandoc.convert_file(
-                        self._input,
-                        self._fmt,
-                        outputfile=self._output,
-                        extra_args=extra,
-                        encoding="utf-8",
-                    )
-                    self.log.emit(f"✓ Готово → {self._output}")
-                    self.done.emit(True)
-                    return
-                except Exception as e2:
-                    error_msg = str(e2)
             self.log.emit(f"✗ Ошибка: {error_msg}")
+            if "pdflatex" in error_msg or "pdf-engine" in error_msg:
+                self.log.emit(
+                    "ℹ Для вывода в PDF нужен LaTeX-движок. "
+                    "Установите MiKTeX (https://miktex.org) и повторите попытку."
+                )
             self.done.emit(False)
 
 
@@ -105,7 +86,7 @@ class PandocTab(QWidget):
         # Формат вывода
         layout.addWidget(QLabel("Формат вывода:"))
         self._fmt_combo = QComboBox()
-        for label, ext, _ in FORMATS:
+        for label, _writer, ext, _standalone in FORMATS:
             self._fmt_combo.addItem(f"{label}  (.{ext})", ext)
         self._fmt_combo.currentIndexChanged.connect(self._on_format_changed)
         layout.addWidget(self._fmt_combo)
@@ -139,9 +120,11 @@ class PandocTab(QWidget):
     def _current_ext(self) -> str:
         return self._fmt_combo.currentData()
 
+    def _current_writer(self) -> str:
+        return FORMATS[self._fmt_combo.currentIndex()][1]
+
     def _current_standalone(self) -> bool:
-        idx = self._fmt_combo.currentIndex()
-        return FORMATS[idx][2]
+        return FORMATS[self._fmt_combo.currentIndex()][3]
 
     def _browse_input(self) -> None:
         path, _ = QFileDialog.getOpenFileName(self, "Выбрать файл")
@@ -181,11 +164,10 @@ class PandocTab(QWidget):
             return
 
         self._convert_btn.setEnabled(False)
-        fmt = self._current_ext()
-        self._log.append(f"▶ Конвертация в .{fmt}: {input_path}")
+        self._log.append(f"▶ Конвертация в .{self._current_ext()}: {input_path}")
 
         self._worker = _ConvertWorker(
-            input_path, output_path, fmt, self._current_standalone()
+            input_path, output_path, self._current_writer(), self._current_standalone()
         )
         self._worker.log.connect(self._log.append)
         self._worker.done.connect(self._on_done)
