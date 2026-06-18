@@ -96,10 +96,9 @@ class ImagesTab(QWidget):
         if not path:
             return
         self._input_edit.setText(path)
-        # по умолчанию — папка <имя файла>_images рядом с исходником
-        if not self._dest_edit.text():
-            default = str(Path(path).with_suffix("")) + "_images"
-            self._dest_edit.setText(default)
+        # путь назначения всегда следует за новым файлом: <имя>_images рядом с ним;
+        # папка создаётся автоматически при извлечении — заранее создавать не нужно
+        self._dest_edit.setText(str(Path(path).with_suffix("")) + "_images")
 
     def _browse_dest(self) -> None:
         initial = self._dest_edit.text() or str(Path.home())
