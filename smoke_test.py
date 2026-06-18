@@ -166,6 +166,20 @@ def t_images_md():
     assert os.path.isdir(media), "папка с медиа не создана"
 check("Pandoc: docx → md, картинки с относительными путями", t_images_md)
 
+# 9b. Логирование: setup_logging создаёт файл и пишет в него
+def t_logging():
+    import logging
+    import logging_setup
+    log_file = logging_setup.setup_logging()
+    logging.getLogger("smoke_test").info("проверочная строка лога")
+    for h in logging.getLogger().handlers:
+        h.flush()
+    assert os.path.isfile(log_file), "файл лога не создан"
+    content = open(log_file, encoding="utf-8").read()
+    assert "проверочная строка лога" in content, "строка не записалась в лог"
+    assert "DocForge — старт сессии" in content, "окружение не залогировано"
+check("Логирование: запись в файл работает", t_logging)
+
 # 10. MarkItDown: извлечение встроенных изображений из docx
 def t_markitdown_images():
     docx = os.path.join(tmp, "img.docx")  # создан тестом выше

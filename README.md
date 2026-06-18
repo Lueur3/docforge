@@ -119,3 +119,14 @@ take a minute while those packages download.
 4. Click **Convert**
 
 Conversion results and errors appear in the log area at the bottom of each tab.
+
+---
+
+## Logs
+
+A detailed log is written to `%APPDATA%\DocForge\logs\docforge.log` (rotated, with a few
+backups). It records each conversion — input file, format, target format, output path,
+options, the tool used and its version — and full tracebacks for any error.
+
+The log file path is shown in the status bar at the bottom of the window; click it to open
+the folder. When reporting a problem, attach this file.

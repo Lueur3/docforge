@@ -1,3 +1,4 @@
+import logging
 import os
 import urllib.parse
 from pathlib import Path
@@ -10,6 +11,8 @@ from PyQt6.QtWidgets import (
 from PyQt6.QtCore import QThread, pyqtSignal
 
 import pdf_helper
+
+log = logging.getLogger(__name__)
 
 
 # Форматы: (отображаемое имя, writer для pandoc, расширение, флаг --standalone)
@@ -43,11 +46,19 @@ class _ConvertWorker(QThread):
         try:
             import pypandoc
 
+            in_ext = Path(self._input).suffix.lower()
+            size = os.path.getsize(self._input) if os.path.isfile(self._input) else -1
+            log.info(
+                "Pandoc: вход=%s (формат=%s, размер=%d Б) → writer=%s, выход=%s, standalone=%s",
+                self._input, in_ext, size, self._writer, self._output, self._standalone,
+            )
+
             extra = ["--standalone"] if self._standalone else []
 
             if self._writer == "pdf":
                 engine = pdf_helper.find_pdf_engine()
                 if engine is None:
+                    log.warning("Pandoc: PDF-движок не найден")
                     self.log.emit("✗ Для вывода в PDF нужен LaTeX-движок.")
                     self.log.emit(
                         "ℹ Установите MiKTeX (https://miktex.org) — "
@@ -55,6 +66,7 @@ class _ConvertWorker(QThread):
                     )
                     self.done.emit(False)
                     return
+                log.info("Pandoc: PDF-движок=%s", engine)
                 self.log.emit(f"▶ PDF-движок: {engine}")
                 pdf_helper.ensure_autoinstall(engine)
                 extra.append(f"--pdf-engine={engine}")
@@ -76,6 +88,7 @@ class _ConvertWorker(QThread):
                 # иначе картинки не рендерятся в VS Code, GitHub, Obsidian
                 writer = "markdown-link_attributes-raw_html"
 
+            log.debug("Pandoc: pypandoc.convert_file writer=%s extra_args=%s", writer, extra)
             pypandoc.convert_file(
                 self._input,
                 writer,
@@ -87,11 +100,16 @@ class _ConvertWorker(QThread):
                 self._relativize_media_paths(media_dir)
                 self.log.emit(f"ℹ Картинки извлечены в: {media_dir}")
 
+            log.info("Pandoc: готово → %s", self._output)
             self.log.emit(f"✓ Готово → {self._output}")
             self.done.emit(True)
         except Exception as e:
             error_msg = str(e)
-            self.log.emit(f"✗ Ошибка: {error_msg}")
+            log.exception(
+                "Pandoc: ошибка конвертации %s → %s (writer=%s)",
+                self._input, self._output, self._writer,
+            )
+            self.log.emit(f"✗ Ошибка Pandoc: {error_msg}")
             if self._writer == "pdf" and "package" in error_msg.lower():
                 self.log.emit(
                     "ℹ Похоже, MiKTeX не хватает LaTeX-пакетов. Откройте MiKTeX Console → "

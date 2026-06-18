@@ -1,8 +1,11 @@
+import logging
 import os
 import shutil
 import subprocess
 import sys
 from typing import Optional
+
+log = logging.getLogger(__name__)
 
 # Стандартные пути установки MiKTeX — PATH может быть ещё не обновлён
 # в текущем процессе после установки через инсталлер
@@ -27,11 +30,14 @@ def find_pdf_engine() -> Optional[str]:
     for name in _ENGINES:
         path = shutil.which(name)
         if path:
+            log.info("PDF-движок найден в PATH: %s", path)
             return path
         for d in dirs:
             candidate = os.path.join(d, name + ".exe")
             if os.path.isfile(candidate):
+                log.info("PDF-движок найден: %s", candidate)
                 return candidate
+    log.info("PDF-движок не найден (проверены PATH и %s)", dirs)
     return None
 
 
@@ -53,6 +59,7 @@ def ensure_autoinstall(engine_path: str) -> None:
         return
     initexmf = os.path.join(os.path.dirname(engine_path), "initexmf.exe")
     if not os.path.isfile(initexmf):
+        log.debug("initexmf не найден рядом с %s — пропуск автоустановки", engine_path)
         return
     try:
         subprocess.run(
@@ -61,5 +68,6 @@ def ensure_autoinstall(engine_path: str) -> None:
             stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
         )
         _autoinstall_done = True
+        log.info("MiKTeX: включена автоустановка пакетов (AutoInstall=1)")
     except Exception:
-        pass
+        log.exception("MiKTeX: не удалось включить автоустановку пакетов")

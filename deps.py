@@ -1,4 +1,5 @@
 import importlib.util
+import logging
 import os
 import shutil
 import subprocess
@@ -13,6 +14,8 @@ from PyQt6.QtWidgets import (
 
 import ffmpeg_helper
 import pdf_helper
+
+log = logging.getLogger(__name__)
 
 _MARKER = Path(os.getenv("APPDATA", str(Path.home()))) / "DocForge" / "setup_done"
 
@@ -60,6 +63,7 @@ class _SetupWorker(QThread):
         self._miktex = miktex
 
     def _pip(self, package: str) -> None:
+        log.info("Установка пакета: %s", package)
         subprocess.check_call(
             [sys.executable, "-m", "pip", "install", "--quiet", package],
             stdout=subprocess.DEVNULL,
@@ -68,6 +72,8 @@ class _SetupWorker(QThread):
         )
 
     def run(self) -> None:
+        log.info("Настройка: ядро=%s, ffmpeg=%s, miktex=%s",
+                 self._core, self._ffmpeg, self._miktex)
         try:
             if self._core:
                 if not _markitdown_installed():
@@ -103,8 +109,10 @@ class _SetupWorker(QThread):
                 if engine:
                     pdf_helper.ensure_autoinstall(engine)
         except Exception as e:
+            log.exception("Настройка: ошибка установки компонентов")
             self.done.emit(False, str(e))
             return
+        log.info("Настройка: установка завершена успешно")
         self.done.emit(True, "")
 
 
@@ -229,5 +237,7 @@ def ensure_dependencies(_app: QApplication) -> None:
     пишется только после успешной установки, поэтому наличия пакетов
     достаточно. Тяжёлые проверки — внутри SetupDialog."""
     if _MARKER.exists() and _module_present("markitdown") and _module_present("pypandoc"):
+        log.debug("Зависимости на месте, окно настройки пропущено")
         return
+    log.info("Открытие окна настройки (первый запуск или ядро не установлено)")
     SetupDialog().exec()

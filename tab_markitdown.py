@@ -1,5 +1,6 @@
 import base64
 import hashlib
+import logging
 import os
 import re
 from pathlib import Path
@@ -12,6 +13,8 @@ from PyQt6.QtWidgets import (
 from PyQt6.QtCore import QThread, pyqtSignal
 
 import ffmpeg_helper
+
+log = logging.getLogger(__name__)
 
 # Текстовые форматы, для которых автоопределение кодировки может ошибаться
 # (charset-normalizer на системах с не-латинской локалью путает UTF-8 с cp125x)
@@ -43,6 +46,7 @@ def extract_embedded_images(md_path: str) -> int:
     text = p.read_text(encoding="utf-8")
     media_dir = Path(str(p.with_suffix("")) + "_media")
     saved: dict[str, str] = {}  # md5 → имя файла
+    log.debug("Извлечение изображений из %s в %s", md_path, media_dir)
 
     def _replace(m: re.Match) -> str:
         subtype, b64 = m.group(1), m.group(2)
@@ -71,18 +75,27 @@ def convert_to_markdown(input_path: str, output_path: str,
                         extract_images: bool = False) -> int:
     """Конвертирует файл в Markdown. Возвращает число извлечённых картинок."""
     from markitdown import MarkItDown, StreamInfo
-    kwargs = {}
     ext = Path(input_path).suffix.lower()
+    size = os.path.getsize(input_path) if os.path.isfile(input_path) else -1
+    log.info(
+        "MarkItDown: вход=%s (формат=%s, размер=%d Б) → выход=%s, извлечение_картинок=%s",
+        input_path, ext, size, output_path, extract_images,
+    )
+    kwargs = {}
     if ext in _TEXT_EXTENSIONS and _is_valid_utf8(input_path):
         kwargs["stream_info"] = StreamInfo(charset="utf-8")
+        log.debug("MarkItDown: применена подсказка кодировки UTF-8")
     if extract_images:
         # иначе MarkItDown пишет обрезанный 'data:image/png;base64...'
         kwargs["keep_data_uris"] = True
     result = MarkItDown().convert(input_path, **kwargs)
     with open(output_path, "w", encoding="utf-8") as f:
         f.write(result.text_content)
+    log.info("MarkItDown: записано %d символов в %s", len(result.text_content), output_path)
     if extract_images:
-        return extract_embedded_images(output_path)
+        count = extract_embedded_images(output_path)
+        log.info("MarkItDown: извлечено изображений: %d", count)
+        return count
     return 0
 
 
@@ -105,7 +118,10 @@ class _ConvertWorker(QThread):
             self.log.emit(f"✓ Готово → {self._output}")
             self.done.emit(True)
         except Exception as e:
-            self.log.emit(f"✗ Ошибка: {e}")
+            log.exception(
+                "MarkItDown: ошибка конвертации %s → %s", self._input, self._output
+            )
+            self.log.emit(f"✗ Ошибка MarkItDown: {e}")
             self.done.emit(False)
 
 

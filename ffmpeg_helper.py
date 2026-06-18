@@ -1,9 +1,12 @@
+import logging
 import shutil
 import subprocess
 import sys
 from typing import Optional
 
 from PyQt6.QtCore import QThread, pyqtSignal
+
+log = logging.getLogger(__name__)
 
 # не показывать окно консоли при запуске из pythonw (GUI без терминала)
 _NO_WINDOW = subprocess.CREATE_NO_WINDOW if sys.platform == "win32" else 0
@@ -42,11 +45,14 @@ class FfmpegInstallWorker(QThread):
                 creationflags=_NO_WINDOW,
             )
         except subprocess.CalledProcessError as e:
+            log.exception("ffmpeg: pip install imageio-ffmpeg завершился с ошибкой")
             self.done.emit(False, f"pip install завершился с ошибкой: {e}")
             return
 
         path = find_ffmpeg()
         if path:
+            log.info("ffmpeg: установлен, путь=%s", path)
             self.done.emit(True, path)
         else:
+            log.warning("ffmpeg: пакет установлен, но бинарник не обнаружен")
             self.done.emit(False, "Пакет установлен, но ffmpeg не обнаружен")

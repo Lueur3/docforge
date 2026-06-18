@@ -78,6 +78,11 @@ def _apply_dark_theme(app: QApplication) -> None:
 
 
 def main() -> None:
+    from logging_setup import setup_logging
+    log_file = setup_logging()
+    import logging
+    log = logging.getLogger(__name__)
+
     # без этого Windows показывает в панели задач иконку Python, а не приложения
     if sys.platform == "win32":
         import ctypes
@@ -99,8 +104,9 @@ def main() -> None:
     if ffmpeg_path:
         configure_pydub(ffmpeg_path)
 
-    window = MainWindow()
+    window = MainWindow(log_file)
     window.show()
+    log.info("Окно показано, лог пишется в %s", log_file)
     sys.exit(app.exec())
 
 
