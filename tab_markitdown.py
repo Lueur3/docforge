@@ -1,8 +1,5 @@
-import base64
-import hashlib
 import logging
 import os
-import re
 from pathlib import Path
 from typing import Optional
 
@@ -12,7 +9,8 @@ from PyQt6.QtWidgets import (
 )
 from PyQt6.QtCore import QThread, pyqtSignal
 
-import ffmpeg_helper
+import file_filters
+import image_extract
 
 log = logging.getLogger(__name__)
 
@@ -28,47 +26,6 @@ def _is_valid_utf8(path: str) -> bool:
         return True
     except (UnicodeDecodeError, OSError):
         return False
-
-
-_DATA_URI_RE = re.compile(r"data:image/([a-zA-Z0-9.+-]+);base64,([A-Za-z0-9+/=]+)")
-
-# mime-подтип → расширение файла, если они не совпадают
-_MIME_EXT = {"jpeg": "jpg", "svg+xml": "svg", "x-emf": "emf", "x-wmf": "wmf"}
-
-
-def extract_embedded_images(md_path: str) -> int:
-    """Декодирует base64-картинки из .md в папку <имя>_media.
-
-    Ссылки в файле заменяются на относительные. Одинаковые картинки
-    сохраняются один раз. Возвращает число извлечённых файлов.
-    """
-    p = Path(md_path)
-    text = p.read_text(encoding="utf-8")
-    media_dir = Path(str(p.with_suffix("")) + "_media")
-    saved: dict[str, str] = {}  # md5 → имя файла
-    log.debug("Извлечение изображений из %s в %s", md_path, media_dir)
-
-    def _replace(m: re.Match) -> str:
-        subtype, b64 = m.group(1), m.group(2)
-        try:
-            data = base64.b64decode(b64)
-        except Exception:
-            return m.group(0)
-        if not data:
-            return m.group(0)
-        digest = hashlib.md5(data).hexdigest()
-        if digest not in saved:
-            ext = _MIME_EXT.get(subtype, subtype)
-            name = f"image{len(saved) + 1}.{ext}"
-            media_dir.mkdir(exist_ok=True)
-            (media_dir / name).write_bytes(data)
-            saved[digest] = name
-        return f"{media_dir.name}/{saved[digest]}"
-
-    new_text = _DATA_URI_RE.sub(_replace, text)
-    if new_text != text:
-        p.write_text(new_text, encoding="utf-8")
-    return len(saved)
 
 
 def convert_to_markdown(input_path: str, output_path: str,
@@ -93,7 +50,7 @@ def convert_to_markdown(input_path: str, output_path: str,
         f.write(result.text_content)
     log.info("MarkItDown: записано %d символов в %s", len(result.text_content), output_path)
     if extract_images:
-        count = extract_embedded_images(output_path)
+        count = image_extract.extract_to_markdown_media(output_path)
         log.info("MarkItDown: извлечено изображений: %d", count)
         return count
     return 0
@@ -129,9 +86,7 @@ class MarkItDownTab(QWidget):
     def __init__(self) -> None:
         super().__init__()
         self._worker: Optional[_ConvertWorker] = None
-        self._ffmpeg_worker: Optional[ffmpeg_helper.FfmpegInstallWorker] = None
         self._build_ui()
-        self._refresh_ffmpeg_status()
 
     def _build_ui(self) -> None:
         layout = QVBoxLayout(self)
@@ -174,18 +129,6 @@ class MarkItDownTab(QWidget):
         self._convert_btn.clicked.connect(self._run_convert)
         layout.addWidget(self._convert_btn)
 
-        # Статус ffmpeg
-        ffmpeg_row = QHBoxLayout()
-        ffmpeg_row.setSpacing(8)
-        self._ffmpeg_label = QLabel()
-        self._ffmpeg_install_btn = QPushButton("Установить ffmpeg")
-        self._ffmpeg_install_btn.setFixedWidth(150)
-        self._ffmpeg_install_btn.clicked.connect(self._install_ffmpeg)
-        ffmpeg_row.addWidget(self._ffmpeg_label)
-        ffmpeg_row.addWidget(self._ffmpeg_install_btn)
-        ffmpeg_row.addStretch()
-        layout.addLayout(ffmpeg_row)
-
         # Лог
         layout.addWidget(QLabel("Лог:"))
         self._log = QTextEdit()
@@ -193,10 +136,10 @@ class MarkItDownTab(QWidget):
         self._log.setMinimumHeight(100)
         layout.addWidget(self._log)
 
-    # ------------------------------------------------------------------
-
     def _browse_input(self) -> None:
-        path, _ = QFileDialog.getOpenFileName(self, "Выбрать файл")
+        path, _ = QFileDialog.getOpenFileName(
+            self, "Выбрать файл", "", file_filters.MARKITDOWN_INPUT
+        )
         if not path:
             return
         self._input_edit.setText(path)
@@ -234,40 +177,3 @@ class MarkItDownTab(QWidget):
 
     def _on_done(self, _success: bool) -> None:
         self._convert_btn.setEnabled(True)
-
-    # ------------------------------------------------------------------
-
-    def _refresh_ffmpeg_status(self) -> None:
-        path = ffmpeg_helper.find_ffmpeg()
-        if path:
-            ffmpeg_helper.configure_pydub(path)
-            self._ffmpeg_label.setText("ffmpeg: ✓  доступен  (аудио/видео поддерживаются)")
-            self._ffmpeg_label.setStyleSheet("color: #5cb85c; font-size: 11px;")
-            self._ffmpeg_install_btn.setVisible(False)
-        else:
-            self._ffmpeg_label.setText("ffmpeg: не найден  (аудио/видео недоступны)")
-            self._ffmpeg_label.setStyleSheet("color: #c8a050; font-size: 11px;")
-            self._ffmpeg_install_btn.setVisible(True)
-            self._ffmpeg_install_btn.setEnabled(True)
-            self._ffmpeg_install_btn.setText("Установить ffmpeg")
-
-    def _install_ffmpeg(self) -> None:
-        self._ffmpeg_install_btn.setEnabled(False)
-        self._ffmpeg_install_btn.setText("Установка...")
-        self._log.append("▶ Установка ffmpeg...")
-
-        self._ffmpeg_worker = ffmpeg_helper.FfmpegInstallWorker()
-        self._ffmpeg_worker.done.connect(self._on_ffmpeg_installed)
-        self._ffmpeg_worker.start()
-
-    def _on_ffmpeg_installed(self, success: bool, path_or_error: str) -> None:
-        if success:
-            self._log.append(f"✓ ffmpeg установлен: {path_or_error}")
-            self._ffmpeg_label.setText("ffmpeg: ✓  доступен  (аудио/видео поддерживаются)")
-            self._ffmpeg_label.setStyleSheet("color: #5cb85c; font-size: 11px;")
-            self._ffmpeg_install_btn.setVisible(False)
-            ffmpeg_helper.configure_pydub(path_or_error)
-        else:
-            self._log.append(f"✗ Ошибка установки ffmpeg: {path_or_error}")
-            self._ffmpeg_install_btn.setEnabled(True)
-            self._ffmpeg_install_btn.setText("Установить ffmpeg")

@@ -19,11 +19,14 @@ Supported input: Word, PDF, Excel, PowerPoint, HTML, images (with OCR), and more
 - **Extract images** (optional, on by default): MarkItDown embeds images as base64;
   this option decodes them into an `<output>_media` folder and rewrites links to
   relative paths, so the Markdown renders with images in any viewer
-- Optional audio/video support via ffmpeg — one-click install inside the app
+- Audio/video support via ffmpeg (optional, installed from the **Components** dialog)
 
 ### Pandoc tab
 
 Full bidirectional conversion between document formats via Pandoc.
+
+Options: table of contents (`--toc`), section numbering (`--number-sections`),
+syntax-highlighting style for code.
 
 | Output format | Extension |
 |---|---|
@@ -41,11 +44,19 @@ Full bidirectional conversion between document formats via Pandoc.
 - Output file extension updates automatically when the format changes
 - Input format is detected automatically from the file extension
 
+### Images tab
+
+Extracts embedded images from a file (Word, PowerPoint, PDF, EPUB, etc.) into a
+folder of your choice, without producing any Markdown — just the images.
+
 ### General
 
 - Dark theme
 - UTF-8 throughout — Cyrillic and other non-Latin text works out of the box
 - Conversion runs in a background thread — UI stays responsive
+- Browse dialogs show only supported file types by default
+- **Components** button (top-right corner) — install or check ffmpeg, MiKTeX and the
+  core at any time, not just on first launch
 - On first launch a setup window installs MarkItDown and Pandoc automatically and
   lets you opt into the optional components
 
@@ -85,8 +96,8 @@ components — ffmpeg and MiKTeX — have toggles you can switch off.
 Enables converting audio and video files in the MarkItDown tab
 (e.g. extracting transcripts from `.mp3`, `.mp4`, `.wav`).
 
-Installed from the setup window, or any time later via the **Install ffmpeg** button
-in the MarkItDown tab. The app uses [imageio-ffmpeg](https://github.com/imageio/imageio-ffmpeg)
+Installed from the **Components** dialog (button in the top-right corner), on first launch
+or any time later. The app uses [imageio-ffmpeg](https://github.com/imageio/imageio-ffmpeg)
 — no manual download needed. If ffmpeg is already in your system PATH, it is detected automatically.
 
 ### MiKTeX — PDF output
@@ -115,8 +126,15 @@ take a minute while those packages download.
 
 1. Click **Browse** and select an input file
 2. Choose an output format from the dropdown
-3. The output path is updated automatically — adjust if needed
-4. Click **Convert**
+3. Optionally enable table of contents, section numbering, or a code-highlighting style
+4. The output path is updated automatically — adjust if needed
+5. Click **Convert**
+
+**Images tab**
+
+1. Click **Browse** and select a file that contains images
+2. Choose the destination folder
+3. Click **Extract images**
 
 Conversion results and errors appear in the log area at the bottom of each tab.
 

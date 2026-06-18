@@ -6,13 +6,28 @@ from typing import Optional
 
 from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel,
-    QLineEdit, QPushButton, QTextEdit, QFileDialog, QComboBox,
+    QLineEdit, QPushButton, QTextEdit, QFileDialog, QComboBox, QCheckBox,
 )
 from PyQt6.QtCore import QThread, pyqtSignal
 
+import file_filters
 import pdf_helper
 
 log = logging.getLogger(__name__)
+
+# Стили подсветки кода Pandoc; "" — не передавать флаг (стиль по умолчанию)
+HIGHLIGHT_STYLES = [
+    ("По умолчанию", ""),
+    ("pygments", "pygments"),
+    ("tango", "tango"),
+    ("kate", "kate"),
+    ("monochrome", "monochrome"),
+    ("breezedark", "breezedark"),
+    ("espresso", "espresso"),
+    ("zenburn", "zenburn"),
+    ("haddock", "haddock"),
+    ("Без подсветки", "--no-highlight"),
+]
 
 
 # Форматы: (отображаемое имя, writer для pandoc, расширение, флаг --standalone)
@@ -35,12 +50,17 @@ class _ConvertWorker(QThread):
     log  = pyqtSignal(str)
     done = pyqtSignal(bool)
 
-    def __init__(self, input_path: str, output_path: str, writer: str, standalone: bool) -> None:
+    def __init__(self, input_path: str, output_path: str, writer: str, standalone: bool,
+                 toc: bool = False, number_sections: bool = False,
+                 highlight: str = "") -> None:
         super().__init__()
-        self._input      = input_path
-        self._output     = output_path
-        self._writer     = writer
-        self._standalone = standalone
+        self._input           = input_path
+        self._output          = output_path
+        self._writer          = writer
+        self._standalone      = standalone
+        self._toc             = toc
+        self._number_sections = number_sections
+        self._highlight       = highlight
 
     def run(self) -> None:
         try:
@@ -81,6 +101,18 @@ class _ConvertWorker(QThread):
                 # картинки извлекаются в папку рядом с выходным файлом
                 media_dir = str(Path(self._output).with_suffix("")) + "_media"
                 extra.append(f"--extract-media={media_dir}")
+
+            # пользовательские опции
+            if self._toc:
+                extra.append("--toc")
+                if "--standalone" not in extra:
+                    extra.append("--standalone")  # оглавление требует полный документ
+            if self._number_sections:
+                extra.append("--number-sections")
+            if self._highlight == "--no-highlight":
+                extra.append("--no-highlight")
+            elif self._highlight:
+                extra.append(f"--highlight-style={self._highlight}")
 
             writer = self._writer
             if writer == "markdown":
@@ -183,6 +215,21 @@ class PandocTab(QWidget):
         row_out.addWidget(btn_out)
         layout.addLayout(row_out)
 
+        # Опции Pandoc
+        opt_row = QHBoxLayout()
+        opt_row.setSpacing(12)
+        self._toc_chk = QCheckBox("Оглавление")
+        self._numsec_chk = QCheckBox("Нумерация разделов")
+        opt_row.addWidget(self._toc_chk)
+        opt_row.addWidget(self._numsec_chk)
+        opt_row.addWidget(QLabel("Подсветка кода:"))
+        self._highlight_combo = QComboBox()
+        for label, _value in HIGHLIGHT_STYLES:
+            self._highlight_combo.addItem(label)
+        opt_row.addWidget(self._highlight_combo)
+        opt_row.addStretch()
+        layout.addLayout(opt_row)
+
         # Кнопка конвертации
         self._convert_btn = QPushButton("Конвертировать")
         self._convert_btn.setObjectName("btn_convert")
@@ -207,7 +254,9 @@ class PandocTab(QWidget):
         return FORMATS[self._fmt_combo.currentIndex()][3]
 
     def _browse_input(self) -> None:
-        path, _ = QFileDialog.getOpenFileName(self, "Выбрать файл")
+        path, _ = QFileDialog.getOpenFileName(
+            self, "Выбрать файл", "", file_filters.PANDOC_INPUT
+        )
         if not path:
             return
         self._input_edit.setText(path)
@@ -244,8 +293,12 @@ class PandocTab(QWidget):
         self._convert_btn.setEnabled(False)
         self._log.append(f"▶ Конвертация в .{self._current_ext()}: {input_path}")
 
+        highlight = HIGHLIGHT_STYLES[self._highlight_combo.currentIndex()][1]
         self._worker = _ConvertWorker(
-            input_path, output_path, self._current_writer(), self._current_standalone()
+            input_path, output_path, self._current_writer(), self._current_standalone(),
+            toc=self._toc_chk.isChecked(),
+            number_sections=self._numsec_chk.isChecked(),
+            highlight=highlight,
         )
         self._worker.log.connect(self._log.append)
         self._worker.done.connect(self._on_done)

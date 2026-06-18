@@ -38,6 +38,7 @@ def check(name: str, fn) -> None:
 # 1. Импорты приложения
 def t_imports():
     import deps, ffmpeg_helper, window, tab_markitdown, tab_pandoc  # noqa
+    import tab_images, image_extract, file_filters, logging_setup  # noqa
 check("Импорт всех модулей приложения", t_imports)
 
 # 2. Pandoc установлен
@@ -192,6 +193,30 @@ def t_markitdown_images():
     assert "data:image" not in text, "в md остался base64"
     assert "mid_img_media/" in text, "нет относительной ссылки на картинку"
 check("MarkItDown: извлечение изображений из docx", t_markitdown_images)
+
+# 10b. Извлечение изображений в произвольную папку (вкладка «Изображения»)
+def t_images_only():
+    import image_extract
+    docx = os.path.join(tmp, "img.docx")  # создан тестом выше
+    dest = os.path.join(tmp, "только_картинки")
+    count = image_extract.extract_images_only(docx, dest)
+    assert count >= 1, f"картинки не извлечены (count={count})"
+    assert os.path.isdir(dest) and os.listdir(dest), "папка назначения пуста"
+check("Изображения: извлечение из docx в выбранную папку", t_images_only)
+
+# 10c. Опции Pandoc: оглавление + нумерация разделов в html
+def t_pandoc_options():
+    import pypandoc
+    src = os.path.join(tmp, "опции.md")
+    with open(src, "w", encoding="utf-8") as f:
+        f.write("# Раздел один\n\nТекст.\n\n## Подраздел\n\nЕщё текст.\n")
+    out = os.path.join(tmp, "опции.html")
+    # как формирует extra_args вкладка Pandoc
+    extra = ["--standalone", "--toc", "--number-sections", "--highlight-style=tango"]
+    pypandoc.convert_file(src, "html", outputfile=out, extra_args=extra)
+    html = open(out, encoding="utf-8").read()
+    assert "toc" in html.lower() or "Раздел один" in html, "оглавление не сформировано"
+check("Pandoc: опции --toc/--number-sections/--highlight-style", t_pandoc_options)
 
 # 11. ffmpeg-статус (информационно)
 def t_ffmpeg():

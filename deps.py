@@ -117,9 +117,12 @@ class _SetupWorker(QThread):
 
 
 class SetupDialog(QDialog):
-    def __init__(self) -> None:
+    def __init__(self, first_run: bool = True) -> None:
         super().__init__()
-        self.setWindowTitle("DocForge — настройка компонентов")
+        self._first_run = first_run
+        self.setWindowTitle(
+            "DocForge — настройка компонентов" if first_run else "DocForge — компоненты"
+        )
         self.setMinimumWidth(540)
 
         core_ok   = _markitdown_installed() and _pandoc_installed()
@@ -168,7 +171,10 @@ class SetupDialog(QDialog):
         layout.addWidget(self._bar)
 
         nothing_to_install = core_ok and ffmpeg_ok and miktex_ok
-        self._btn = QPushButton("Продолжить" if nothing_to_install else "Установить и продолжить")
+        if nothing_to_install:
+            self._btn = QPushButton("Продолжить" if first_run else "Закрыть")
+        else:
+            self._btn = QPushButton("Установить и продолжить" if first_run else "Установить")
         self._btn.setFixedHeight(34)
         self._btn.clicked.connect(self._start)
         layout.addWidget(self._btn)
@@ -220,14 +226,27 @@ class SetupDialog(QDialog):
     def _on_done(self, success: bool, error: str) -> None:
         if not success:
             QMessageBox.warning(self, "Ошибка установки", error)
-            if not (_markitdown_installed() and _pandoc_installed()):
+            # критично выйти только если на первом запуске не встало ядро
+            if self._first_run and not (_markitdown_installed() and _pandoc_installed()):
                 sys.exit(1)
+            self._btn.setEnabled(True)
+            return
+        # ffmpeg мог только что установиться — подключаем его к pydub сразу
+        path = ffmpeg_helper.find_ffmpeg()
+        if path:
+            ffmpeg_helper.configure_pydub(path)
         self._finish()
 
     def _finish(self) -> None:
         _MARKER.parent.mkdir(parents=True, exist_ok=True)
         _MARKER.write_text("ok", encoding="utf-8")
         self.accept()
+
+
+def open_components_dialog() -> None:
+    """Открывает диалог компонентов в режиме управления (не первый запуск)."""
+    log.info("Открытие диалога компонентов")
+    SetupDialog(first_run=False).exec()
 
 
 def ensure_dependencies(_app: QApplication) -> None:

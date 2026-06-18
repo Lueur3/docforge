@@ -2,10 +2,12 @@ import logging
 import os
 from pathlib import Path
 
-from PyQt6.QtWidgets import QMainWindow, QTabWidget, QLabel
+from PyQt6.QtWidgets import QMainWindow, QTabWidget, QLabel, QPushButton
 
+import deps
 from tab_markitdown import MarkItDownTab
 from tab_pandoc import PandocTab
+from tab_images import ImagesTab
 
 log = logging.getLogger(__name__)
 
@@ -20,6 +22,14 @@ class MainWindow(QMainWindow):
         tabs = QTabWidget()
         tabs.addTab(MarkItDownTab(), "MarkItDown")
         tabs.addTab(PandocTab(), "Pandoc")
+        tabs.addTab(ImagesTab(), "Изображения")
+
+        # кнопка управления компонентами — всегда видна в углу таб-бара
+        components_btn = QPushButton("Компоненты")
+        components_btn.setToolTip("Установить или проверить ffmpeg, MiKTeX и ядро")
+        components_btn.clicked.connect(self._open_components)
+        tabs.setCornerWidget(components_btn)
+
         self.setCentralWidget(tabs)
 
         if log_file is not None:
@@ -30,6 +40,9 @@ class MainWindow(QMainWindow):
             link.linkActivated.connect(self._open_log_dir)
             self.statusBar().addWidget(link)
         log.debug("MainWindow создан")
+
+    def _open_components(self) -> None:
+        deps.open_components_dialog()
 
     def _open_log_dir(self) -> None:
         folder = str(self._log_file.parent)
