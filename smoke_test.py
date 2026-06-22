@@ -82,13 +82,34 @@ def t_pdf():
     extra = [f"--pdf-engine={engine}"]
     if pdf_helper.is_unicode_engine(engine):
         extra += ["-V", "mainfont=Segoe UI"]
+    extra += ["-V", "geometry:margin=2cm"]  # поля по умолчанию (как в приложении)
     pypandoc.convert_file(src_md, "pdf", outputfile=out, extra_args=extra)
     assert os.path.getsize(out) > 0
-    results.append((PASS, f"Pandoc: md → .pdf (движок: {os.path.basename(engine)})"))
+    results.append((PASS, f"Pandoc: md → .pdf, поля 2cm (движок: {os.path.basename(engine)})"))
 try:
     t_pdf()
 except Exception as e:
     results.append((FAIL, f"Pandoc: md → .pdf — {e}"))
+
+# 4b. Pandoc: PDF через wkhtmltopdf (если установлен)
+def t_pdf_wkhtml():
+    import pypandoc
+    import pdf_helper
+    engine = pdf_helper.find_wkhtmltopdf()
+    if engine is None:
+        results.append((SKIP, "Pandoc: md → .pdf через wkhtmltopdf — не установлен"))
+        return
+    out = os.path.join(tmp, "out_wk.pdf")
+    extra = [f"--pdf-engine={engine}", "--pdf-engine-opt=--enable-local-file-access"]
+    for side in ("top", "right", "bottom", "left"):
+        extra += ["-V", f"margin-{side}=1cm"]
+    pypandoc.convert_file(src_md, "pdf", outputfile=out, extra_args=extra)
+    assert os.path.getsize(out) > 0
+    results.append((PASS, "Pandoc: md → .pdf через wkhtmltopdf"))
+try:
+    t_pdf_wkhtml()
+except Exception as e:
+    results.append((FAIL, f"Pandoc: md → .pdf через wkhtmltopdf — {e}"))
 
 # 5. Pandoc: обратное направление docx → md
 def t_docx_to_md():

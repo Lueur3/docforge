@@ -56,11 +56,25 @@ class _SetupWorker(QThread):
     status = pyqtSignal(str)
     done   = pyqtSignal(bool, str)
 
-    def __init__(self, core: bool, ffmpeg: bool, miktex: bool) -> None:
+    def __init__(self, core: bool, ffmpeg: bool, miktex: bool, wkhtmltopdf: bool) -> None:
         super().__init__()
-        self._core   = core
-        self._ffmpeg = ffmpeg
-        self._miktex = miktex
+        self._core        = core
+        self._ffmpeg      = ffmpeg
+        self._miktex      = miktex
+        self._wkhtmltopdf = wkhtmltopdf
+
+    def _winget(self, package_id: str) -> None:
+        if shutil.which("winget") is None:
+            raise RuntimeError(
+                f"winget недоступен. Установите компонент вручную (id: {package_id})."
+            )
+        subprocess.check_call(
+            ["winget", "install", "--id", package_id, "-e", "--silent",
+             "--accept-package-agreements", "--accept-source-agreements"],
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+            creationflags=_NO_WINDOW,
+        )
 
     def _pip(self, package: str) -> None:
         log.info("Установка пакета: %s", package)
@@ -72,8 +86,8 @@ class _SetupWorker(QThread):
         )
 
     def run(self) -> None:
-        log.info("Настройка: ядро=%s, ffmpeg=%s, miktex=%s",
-                 self._core, self._ffmpeg, self._miktex)
+        log.info("Настройка: ядро=%s, ffmpeg=%s, miktex=%s, wkhtmltopdf=%s",
+                 self._core, self._ffmpeg, self._miktex, self._wkhtmltopdf)
         try:
             if self._core:
                 if not _markitdown_installed():
@@ -91,23 +105,17 @@ class _SetupWorker(QThread):
                 self._pip("imageio-ffmpeg")
 
             if self._miktex:
-                if shutil.which("winget") is None:
-                    raise RuntimeError(
-                        "winget недоступен. Установите MiKTeX вручную: https://miktex.org"
-                    )
                 self.status.emit("Установка MiKTeX через winget (может занять 5–10 минут)...")
-                subprocess.check_call(
-                    ["winget", "install", "--id", "MiKTeX.MiKTeX", "-e", "--silent",
-                     "--accept-package-agreements", "--accept-source-agreements"],
-                    stdout=subprocess.DEVNULL,
-                    stderr=subprocess.DEVNULL,
-                    creationflags=_NO_WINDOW,
-                )
+                self._winget("MiKTeX.MiKTeX")
                 # включаем автоустановку LaTeX-пакетов, иначе первая
                 # сборка PDF падает на неинтерактивном запросе пакета
                 engine = pdf_helper.find_pdf_engine()
                 if engine:
                     pdf_helper.ensure_autoinstall(engine)
+
+            if self._wkhtmltopdf:
+                self.status.emit("Установка wkhtmltopdf через winget...")
+                self._winget("wkhtmltopdf.wkhtmltox")
         except Exception as e:
             log.exception("Настройка: ошибка установки компонентов")
             self.done.emit(False, str(e))
@@ -128,6 +136,7 @@ class SetupDialog(QDialog):
         core_ok   = _markitdown_installed() and _pandoc_installed()
         ffmpeg_ok = ffmpeg_helper.find_ffmpeg() is not None
         miktex_ok = pdf_helper.find_pdf_engine() is not None
+        wkhtml_ok = pdf_helper.find_wkhtmltopdf() is not None
 
         layout = QVBoxLayout(self)
         layout.setContentsMargins(20, 16, 20, 16)
@@ -155,9 +164,15 @@ class SetupDialog(QDialog):
         )
         self._chk_miktex = self._add_row(
             layout,
-            "MiKTeX — вывод в PDF во вкладке Pandoc",
+            "MiKTeX — вывод в PDF во вкладке Pandoc (движок LaTeX)",
             "winget: MiKTeX.MiKTeX, источник miktex.org (~250 МБ)",
             installed=miktex_ok, required=False,
+        )
+        self._chk_wkhtml = self._add_row(
+            layout,
+            "wkhtmltopdf — PDF «как веб-страница» (браузерный движок)",
+            "winget: wkhtmltopdf.wkhtmltox (~70 МБ)",
+            installed=wkhtml_ok, required=False,
         )
 
         layout.addSpacing(8)
@@ -170,7 +185,7 @@ class SetupDialog(QDialog):
         self._bar.hide()
         layout.addWidget(self._bar)
 
-        nothing_to_install = core_ok and ffmpeg_ok and miktex_ok
+        nothing_to_install = core_ok and ffmpeg_ok and miktex_ok and wkhtml_ok
         if nothing_to_install:
             self._btn = QPushButton("Продолжить" if first_run else "Закрыть")
         else:
@@ -208,17 +223,18 @@ class SetupDialog(QDialog):
         core   = not self._chk_core.property("installed")
         ffmpeg = self._chk_ffmpeg.isChecked() and not self._chk_ffmpeg.property("installed")
         miktex = self._chk_miktex.isChecked() and not self._chk_miktex.property("installed")
+        wkhtml = self._chk_wkhtml.isChecked() and not self._chk_wkhtml.property("installed")
 
-        if not (core or ffmpeg or miktex):
+        if not (core or ffmpeg or miktex or wkhtml):
             self._finish()
             return
 
-        for chk in (self._chk_core, self._chk_ffmpeg, self._chk_miktex):
+        for chk in (self._chk_core, self._chk_ffmpeg, self._chk_miktex, self._chk_wkhtml):
             chk.setEnabled(False)
         self._btn.setEnabled(False)
         self._bar.show()
 
-        self._worker = _SetupWorker(core, ffmpeg, miktex)
+        self._worker = _SetupWorker(core, ffmpeg, miktex, wkhtml)
         self._worker.status.connect(self._status.setText)
         self._worker.done.connect(self._on_done)
         self._worker.start()

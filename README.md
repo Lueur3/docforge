@@ -28,6 +28,12 @@ Full bidirectional conversion between document formats via Pandoc.
 Options: table of contents (`--toc`), section numbering (`--number-sections`),
 syntax-highlighting style for code.
 
+For PDF output you can pick the engine and the page margins (default `2cm`, editable):
+
+- **xelatex** (LaTeX) — classic typesetting, great for formulas; handles Cyrillic
+- **wkhtmltopdf** — renders like a browser, so the PDF looks like a web page
+  (closer to VS Code's *Markdown Preview Enhanced*); install it from the **Components** dialog
+
 | Output format | Extension |
 |---|---|
 | Markdown | `.md` |
@@ -105,10 +111,17 @@ or any time later. The app uses [imageio-ffmpeg](https://github.com/imageio/imag
 Required only for the **PDF** output format in the Pandoc tab. The setup window installs it
 via `winget`; you can also install it manually from [miktex.org](https://miktex.org/).
 
-The app prefers the `xelatex` engine (handles Cyrillic) and enables MiKTeX's
+The app uses the `xelatex` engine (handles Cyrillic) and enables MiKTeX's
 on-the-fly package installation automatically, so the first PDF build pulls any
 missing LaTeX packages without prompting. The first PDF conversion may therefore
 take a minute while those packages download.
+
+### wkhtmltopdf — browser-style PDF
+
+An alternative PDF engine that renders through a WebKit browser, so the PDF looks
+like a web page (full width, CSS layout) rather than a LaTeX document. Pick it in the
+Pandoc tab's **PDF — engine** dropdown. Installed from the **Components** dialog
+(`winget: wkhtmltopdf.wkhtmltox`).
 
 ---
 
@@ -127,8 +140,9 @@ take a minute while those packages download.
 1. Click **Browse** and select an input file
 2. Choose an output format from the dropdown
 3. Optionally enable table of contents, section numbering, or a code-highlighting style
-4. The output path is updated automatically — adjust if needed
-5. Click **Convert**
+4. For PDF, choose the engine and margins (enabled only when the format is PDF)
+5. The output path is updated automatically — adjust if needed
+6. Click **Convert**
 
 **Images tab**
 

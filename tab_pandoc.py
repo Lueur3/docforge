@@ -52,7 +52,7 @@ class _ConvertWorker(QThread):
 
     def __init__(self, input_path: str, output_path: str, writer: str, standalone: bool,
                  toc: bool = False, number_sections: bool = False,
-                 highlight: str = "") -> None:
+                 highlight: str = "", pdf_engine: str = "latex", margin: str = "") -> None:
         super().__init__()
         self._input           = input_path
         self._output          = output_path
@@ -61,6 +61,8 @@ class _ConvertWorker(QThread):
         self._toc             = toc
         self._number_sections = number_sections
         self._highlight       = highlight
+        self._pdf_engine      = pdf_engine
+        self._margin          = margin
 
     def run(self) -> None:
         try:
@@ -75,7 +77,23 @@ class _ConvertWorker(QThread):
 
             extra = ["--standalone"] if self._standalone else []
 
-            if self._writer == "pdf":
+            if self._writer == "pdf" and self._pdf_engine == "wkhtml":
+                engine = pdf_helper.find_wkhtmltopdf()
+                if engine is None:
+                    log.warning("Pandoc: wkhtmltopdf не найден")
+                    self.log.emit("✗ Движок wkhtmltopdf не установлен.")
+                    self.log.emit("ℹ Установите его в диалоге «Компоненты».")
+                    self.done.emit(False)
+                    return
+                log.info("Pandoc: PDF-движок=wkhtmltopdf (%s)", engine)
+                self.log.emit(f"▶ PDF-движок: {engine}")
+                extra.append(f"--pdf-engine={engine}")
+                # доступ к локальным картинкам (требование wkhtmltopdf 0.12.6)
+                extra.append("--pdf-engine-opt=--enable-local-file-access")
+                if self._margin:
+                    for side in ("top", "right", "bottom", "left"):
+                        extra += ["-V", f"margin-{side}={self._margin}"]
+            elif self._writer == "pdf":
                 engine = pdf_helper.find_pdf_engine()
                 if engine is None:
                     log.warning("Pandoc: PDF-движок не найден")
@@ -93,6 +111,8 @@ class _ConvertWorker(QThread):
                 if pdf_helper.is_unicode_engine(engine):
                     # системный шрифт с поддержкой кириллицы
                     extra += ["-V", "mainfont=Segoe UI"]
+                if self._margin:
+                    extra += ["-V", f"geometry:margin={self._margin}"]
             elif self._writer == "html":
                 # картинки из docx/odt/epub встраиваются прямо в html
                 extra.append("--embed-resources")
@@ -230,6 +250,22 @@ class PandocTab(QWidget):
         opt_row.addStretch()
         layout.addLayout(opt_row)
 
+        # Параметры PDF (активны только для формата PDF)
+        pdf_row = QHBoxLayout()
+        pdf_row.setSpacing(8)
+        pdf_row.addWidget(QLabel("PDF — движок:"))
+        self._engine_combo = QComboBox()
+        self._engine_combo.addItem("xelatex (LaTeX)", "latex")
+        self._engine_combo.addItem("wkhtmltopdf (как веб-страница)", "wkhtml")
+        pdf_row.addWidget(self._engine_combo)
+        pdf_row.addWidget(QLabel("поля:"))
+        self._margin_edit = QLineEdit("2cm")
+        self._margin_edit.setFixedWidth(70)
+        self._margin_edit.setToolTip("Например: 2cm, 1.5cm, 1in, 20mm. Пусто — поля движка по умолчанию.")
+        pdf_row.addWidget(self._margin_edit)
+        pdf_row.addStretch()
+        layout.addLayout(pdf_row)
+
         # Кнопка конвертации
         self._convert_btn = QPushButton("Конвертировать")
         self._convert_btn.setObjectName("btn_convert")
@@ -243,6 +279,14 @@ class PandocTab(QWidget):
         self._log.setReadOnly(True)
         self._log.setMinimumHeight(80)
         layout.addWidget(self._log)
+
+        self._update_pdf_controls()
+
+    def _update_pdf_controls(self) -> None:
+        """Движок и поля активны только для формата PDF."""
+        is_pdf = self._current_ext() == "pdf"
+        self._engine_combo.setEnabled(is_pdf)
+        self._margin_edit.setEnabled(is_pdf)
 
     def _current_ext(self) -> str:
         return self._fmt_combo.currentData()
@@ -278,6 +322,7 @@ class PandocTab(QWidget):
             self._output_edit.setText(
                 str(Path(current).with_suffix(f".{self._current_ext()}"))
             )
+        self._update_pdf_controls()
 
     def _run_convert(self) -> None:
         input_path  = self._input_edit.text().strip()
@@ -299,6 +344,8 @@ class PandocTab(QWidget):
             toc=self._toc_chk.isChecked(),
             number_sections=self._numsec_chk.isChecked(),
             highlight=highlight,
+            pdf_engine=self._engine_combo.currentData(),
+            margin=self._margin_edit.text().strip(),
         )
         self._worker.log.connect(self._log.append)
         self._worker.done.connect(self._on_done)
