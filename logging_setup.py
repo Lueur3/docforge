@@ -55,6 +55,13 @@ def setup_logging() -> Path:
     file_handler.setFormatter(fmt)
     root.addHandler(file_handler)
 
+    # Сторонние библиотеки на DEBUG генерируют тысячи строк (особенно pdfminer
+    # при чтении PDF) — это забивает лог и сильно замедляет конвертацию.
+    # Глушим их до WARNING, наши модули остаются на DEBUG.
+    for noisy in ("pdfminer", "pdfplumber", "PIL", "fontTools", "markdown_it",
+                  "urllib3", "charset_normalizer", "matplotlib", "comtypes"):
+        logging.getLogger(noisy).setLevel(logging.WARNING)
+
     # консоль доступна только при запуске через python/DocForge-debug.bat;
     # под pythonw sys.stderr is None — тогда консольный обработчик не нужен
     if sys.stderr is not None:

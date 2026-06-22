@@ -6,12 +6,13 @@ from typing import Optional
 
 from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel,
-    QLineEdit, QPushButton, QTextEdit, QFileDialog, QComboBox, QCheckBox,
+    QLineEdit, QPushButton, QFileDialog, QComboBox, QCheckBox,
 )
 from PyQt6.QtCore import QThread, pyqtSignal
 
 import file_filters
 import pdf_helper
+from ui_utils import LogPanel
 
 log = logging.getLogger(__name__)
 
@@ -235,6 +236,18 @@ class PandocTab(QWidget):
         row_out.addWidget(btn_out)
         layout.addLayout(row_out)
 
+        # Настройки (свёрнуты по умолчанию)
+        self._settings_btn = QPushButton("Настройки ▸")
+        self._settings_btn.setCheckable(True)
+        self._settings_btn.setFixedHeight(24)
+        self._settings_btn.clicked.connect(self._toggle_settings)
+        layout.addWidget(self._settings_btn)
+
+        self._settings_box = QWidget()
+        sbox = QVBoxLayout(self._settings_box)
+        sbox.setContentsMargins(0, 0, 0, 0)
+        sbox.setSpacing(6)
+
         # Опции Pandoc
         opt_row = QHBoxLayout()
         opt_row.setSpacing(12)
@@ -248,7 +261,7 @@ class PandocTab(QWidget):
             self._highlight_combo.addItem(label)
         opt_row.addWidget(self._highlight_combo)
         opt_row.addStretch()
-        layout.addLayout(opt_row)
+        sbox.addLayout(opt_row)
 
         # Параметры PDF (активны только для формата PDF)
         pdf_row = QHBoxLayout()
@@ -264,7 +277,10 @@ class PandocTab(QWidget):
         self._margin_edit.setToolTip("Например: 2cm, 1.5cm, 1in, 20mm. Пусто — поля движка по умолчанию.")
         pdf_row.addWidget(self._margin_edit)
         pdf_row.addStretch()
-        layout.addLayout(pdf_row)
+        sbox.addLayout(pdf_row)
+
+        self._settings_box.hide()
+        layout.addWidget(self._settings_box)
 
         # Кнопка конвертации
         self._convert_btn = QPushButton("Конвертировать")
@@ -273,14 +289,15 @@ class PandocTab(QWidget):
         self._convert_btn.clicked.connect(self._run_convert)
         layout.addWidget(self._convert_btn)
 
-        # Лог
-        layout.addWidget(QLabel("Лог:"))
-        self._log = QTextEdit()
-        self._log.setReadOnly(True)
-        self._log.setMinimumHeight(80)
+        # Лог (скрыт по умолчанию)
+        self._log = LogPanel()
         layout.addWidget(self._log)
 
         self._update_pdf_controls()
+
+    def _toggle_settings(self, checked: bool) -> None:
+        self._settings_box.setVisible(checked)
+        self._settings_btn.setText("Настройки ▾" if checked else "Настройки ▸")
 
     def _update_pdf_controls(self) -> None:
         """Движок и поля активны только для формата PDF."""

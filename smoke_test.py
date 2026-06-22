@@ -38,7 +38,7 @@ def check(name: str, fn) -> None:
 # 1. Импорты приложения
 def t_imports():
     import deps, ffmpeg_helper, window, tab_markitdown, tab_pandoc  # noqa
-    import tab_images, image_extract, file_filters, logging_setup  # noqa
+    import tab_images, image_extract, file_filters, logging_setup, ui_utils  # noqa
 check("Импорт всех модулей приложения", t_imports)
 
 # 2. Pandoc установлен

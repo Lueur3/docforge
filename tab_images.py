@@ -5,12 +5,13 @@ from typing import Optional
 
 from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel,
-    QLineEdit, QPushButton, QTextEdit, QFileDialog,
+    QLineEdit, QPushButton, QFileDialog,
 )
 from PyQt6.QtCore import QThread, pyqtSignal
 
 import file_filters
 import image_extract
+from ui_utils import LogPanel
 
 log = logging.getLogger(__name__)
 
@@ -82,11 +83,8 @@ class ImagesTab(QWidget):
         self._extract_btn.clicked.connect(self._run_extract)
         layout.addWidget(self._extract_btn)
 
-        # Лог
-        layout.addWidget(QLabel("Лог:"))
-        self._log = QTextEdit()
-        self._log.setReadOnly(True)
-        self._log.setMinimumHeight(100)
+        # Лог (скрыт по умолчанию)
+        self._log = LogPanel()
         layout.addWidget(self._log)
 
     def _browse_input(self) -> None:

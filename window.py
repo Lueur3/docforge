@@ -16,8 +16,9 @@ class MainWindow(QMainWindow):
     def __init__(self, log_file: Path | None = None) -> None:
         super().__init__()
         self.setWindowTitle("DocForge")
-        self.setMinimumSize(600, 400)
-        self.resize(600, 400)
+        # фиксированный размер — окно одинаково на всех вкладках; лог и настройки
+        # разворачиваются внутри окна, не меняя его габаритов
+        self.setFixedSize(640, 500)
 
         tabs = QTabWidget()
         tabs.addTab(MarkItDownTab(), "MarkItDown")
