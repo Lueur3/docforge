@@ -9,6 +9,9 @@ import tempfile
 
 sys.stdout.reconfigure(encoding="utf-8")
 
+# пакет лежит в src/ (src-layout)
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "src"))
+
 PASS, FAIL, SKIP = "[OK]  ", "[FAIL]", "[SKIP]"
 results: list[tuple[str, str]] = []
 

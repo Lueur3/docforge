@@ -173,7 +173,7 @@ the folder. When reporting a problem, attach this file.
 ```
 main.py                    launcher (run by DocForge.bat)
 smoke_test.py              offline self-test of all conversion paths
-docforge/
+src/docforge/
   app.py                   entry point: logging, theme, deps, window
   theme.py                 dark theme
   logging_setup.py         file logging

@@ -14,6 +14,9 @@ if hasattr(sys.stdout, "reconfigure"):
 if hasattr(sys.stderr, "reconfigure"):
     sys.stderr.reconfigure(encoding="utf-8")
 
+# пакет лежит в src/ (src-layout) — добавляем его в путь импорта
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "src"))
+
 from docforge.app import main
 
 if __name__ == "__main__":
