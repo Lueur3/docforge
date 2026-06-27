@@ -11,7 +11,7 @@ from PyQt6.QtCore import QThread, pyqtSignal
 
 import file_filters
 import image_extract
-from ui_utils import LogPanel
+from ui_utils import StatusLog
 
 log = logging.getLogger(__name__)
 
@@ -130,9 +130,12 @@ class MarkItDownTab(QWidget):
         self._convert_btn.clicked.connect(self._run_convert)
         layout.addWidget(self._convert_btn)
 
-        # Лог (скрыт по умолчанию)
-        self._log = LogPanel()
+        # строка статуса + «Подробнее»
+        self._log = StatusLog()
         layout.addWidget(self._log)
+
+        # растяжка внизу прижимает содержимое вверх — без больших отступов
+        layout.addStretch()
 
     def _browse_input(self) -> None:
         path, _ = QFileDialog.getOpenFileName(

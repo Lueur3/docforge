@@ -12,7 +12,7 @@ from PyQt6.QtCore import QThread, pyqtSignal
 
 import file_filters
 import pdf_helper
-from ui_utils import LogPanel
+from ui_utils import StatusLog
 
 log = logging.getLogger(__name__)
 
@@ -320,18 +320,18 @@ class PandocTab(QWidget):
         self._convert_btn.clicked.connect(self._run_convert)
         layout.addWidget(self._convert_btn)
 
-        # Лог (скрыт по умолчанию)
-        self._log = LogPanel()
+        # строка статуса + «Подробнее»
+        self._log = StatusLog()
         layout.addWidget(self._log)
+
+        # растяжка внизу прижимает содержимое вверх — без больших отступов
+        layout.addStretch()
 
         self._update_pdf_controls()
 
     def _toggle_settings(self, checked: bool) -> None:
         self._settings_box.setVisible(checked)
         self._settings_btn.setText("Настройки ▾" if checked else "Настройки ▸")
-        window = self.window()
-        if window is not None:
-            window.adjustSize()
 
     def _update_pdf_controls(self) -> None:
         """Движок и поля активны только для формата PDF."""

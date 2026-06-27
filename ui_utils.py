@@ -1,47 +1,61 @@
 from PyQt6.QtWidgets import (
-    QWidget, QVBoxLayout, QPushButton, QTextEdit, QSizePolicy,
+    QWidget, QHBoxLayout, QVBoxLayout, QLabel, QPushButton, QTextEdit,
+    QDialog, QSizePolicy,
 )
 
 
-class LogPanel(QWidget):
-    """Сворачиваемая панель лога: кнопка-переключатель + текстовое поле.
+class StatusLog(QWidget):
+    """Однострочный статус + кнопка «Подробнее».
 
-    По умолчанию лог скрыт. При появлении ошибки (строка с «✗») разворачивается
-    автоматически, чтобы пользователь её увидел.
+    В окне приложения видна только последняя строка (✓/✗/ℹ). Полный лог
+    конвертации открывается по кнопке в отдельном небольшом окне — главное
+    окно при этом не меняет размер.
     """
 
     def __init__(self) -> None:
         super().__init__()
-        layout = QVBoxLayout(self)
-        layout.setContentsMargins(0, 0, 0, 0)
-        layout.setSpacing(4)
+        row = QHBoxLayout(self)
+        row.setContentsMargins(0, 0, 0, 0)
+        row.setSpacing(8)
 
-        self._btn = QPushButton("Показать лог ▸")
-        self._btn.setCheckable(True)
-        self._btn.setFixedHeight(24)
-        self._btn.clicked.connect(self._on_toggle)
-        layout.addWidget(self._btn)
+        self._status = QLabel("")
+        self._status.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Preferred)
+        self._status.setStyleSheet("color: #888; font-size: 11px;")
 
-        self._log = QTextEdit()
-        self._log.setReadOnly(True)
-        self._log.setMinimumHeight(150)
-        self._log.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
-        self._log.hide()
-        layout.addWidget(self._log)
+        self._btn = QPushButton("Подробнее")
+        self._btn.setFixedWidth(90)
+        self._btn.setToolTip("Открыть полный лог конвертации")
+        self._btn.clicked.connect(self._show_details)
 
-    def _on_toggle(self, checked: bool) -> None:
-        self._set_open(checked)
+        row.addWidget(self._status, 1)
+        row.addWidget(self._btn)
 
-    def _set_open(self, opened: bool) -> None:
-        self._log.setVisible(opened)
-        self._btn.setChecked(opened)
-        self._btn.setText("Скрыть лог ▾" if opened else "Показать лог ▸")
-        # окно подстраивает высоту под раскрытый/свёрнутый лог
-        window = self.window()
-        if window is not None:
-            window.adjustSize()
+        self._lines: list[str] = []
+        self._dialog: QDialog | None = None
+        self._view: QTextEdit | None = None
 
     def append(self, text: str) -> None:
-        self._log.append(text)
-        if "✗" in text and not self._log.isVisible():
-            self._set_open(True)
+        self._lines.append(text)
+        self._status.setText(text)
+        if "✗" in text:
+            self._status.setStyleSheet("color: #e06c6c; font-size: 11px;")
+        elif "✓" in text:
+            self._status.setStyleSheet("color: #5cb85c; font-size: 11px;")
+        else:
+            self._status.setStyleSheet("color: #aaa; font-size: 11px;")
+        if self._view is not None:
+            self._view.append(text)
+
+    def _show_details(self) -> None:
+        if self._dialog is None:
+            self._dialog = QDialog(self)
+            self._dialog.setWindowTitle("DocForge — лог конвертации")
+            self._dialog.resize(560, 360)
+            lay = QVBoxLayout(self._dialog)
+            self._view = QTextEdit()
+            self._view.setReadOnly(True)
+            lay.addWidget(self._view)
+        self._view.setPlainText("\n".join(self._lines))
+        self._dialog.show()
+        self._dialog.raise_()
+        self._dialog.activateWindow()
