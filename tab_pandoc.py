@@ -299,8 +299,9 @@ class PandocTab(QWidget):
         pdf_row.setSpacing(8)
         pdf_row.addWidget(QLabel("PDF — движок:"))
         self._engine_combo = QComboBox()
-        self._engine_combo.addItem("xelatex (LaTeX)", "latex")
+        # Chromium первым — движок PDF по умолчанию
         self._engine_combo.addItem("Chromium (как браузер)", "chromium")
+        self._engine_combo.addItem("xelatex (LaTeX)", "latex")
         pdf_row.addWidget(self._engine_combo)
         pdf_row.addWidget(QLabel("поля:"))
         self._margin_edit = QLineEdit("2cm")
