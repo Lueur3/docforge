@@ -31,9 +31,8 @@ syntax-highlighting style for code.
 For PDF output you can pick the engine and the page margins (default `2cm`, editable):
 
 - **xelatex** (LaTeX) — classic typesetting, great for formulas; handles Cyrillic
-- **Chromium** — renders through a real Chromium browser (the same engine family as
-  Puppeteer in VS Code's *Markdown Preview Enhanced*), so the PDF looks like a web page;
-  install it from the **Components** dialog
+- **Chromium** — renders through a Chromium browser, so the PDF looks like a web page
+  (full width, modern CSS); install it from the **Components** dialog
 
 | Output format | Extension |
 |---|---|
@@ -120,10 +119,9 @@ take a minute while those packages download.
 
 ### Chromium — browser-style PDF
 
-An alternative PDF engine that renders through a real Chromium browser (via Playwright,
-the same Chromium engine family as Puppeteer), so the PDF looks like a web page — full
-width, modern CSS — rather than a LaTeX document. Pick it in the Pandoc tab's
-**PDF — engine** dropdown. Installed from the **Components** dialog
+An alternative PDF engine that renders through a Chromium browser (via Playwright), so the
+PDF looks like a web page — full width, modern CSS — rather than a LaTeX document. Pick it
+in the Pandoc tab's **PDF — engine** dropdown. Installed from the **Components** dialog
 (`pip install playwright` plus a ~150 MB Chromium download).
 
 ---
