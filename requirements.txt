@@ -1,3 +1,8 @@
 PyQt6
 markitdown[all]
 pypandoc
+pymupdf
+
+# Опционально (ставятся из диалога «Компоненты»):
+#   imageio-ffmpeg  — аудио/видео в MarkItDown
+#   playwright      — PDF через Chromium (плюс: python -m playwright install chromium)

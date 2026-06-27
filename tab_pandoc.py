@@ -76,25 +76,14 @@ class _ConvertWorker(QThread):
                 self._input, in_ext, size, self._writer, self._output, self._standalone,
             )
 
+            # Chromium — отдельный путь: pandoc делает HTML, Chromium печатает PDF
+            if self._writer == "pdf" and self._pdf_engine == "chromium":
+                self._convert_via_chromium()
+                return
+
             extra = ["--standalone"] if self._standalone else []
 
-            if self._writer == "pdf" and self._pdf_engine == "wkhtml":
-                engine = pdf_helper.find_wkhtmltopdf()
-                if engine is None:
-                    log.warning("Pandoc: wkhtmltopdf не найден")
-                    self.log.emit("✗ Движок wkhtmltopdf не установлен.")
-                    self.log.emit("ℹ Установите его в диалоге «Компоненты».")
-                    self.done.emit(False)
-                    return
-                log.info("Pandoc: PDF-движок=wkhtmltopdf (%s)", engine)
-                self.log.emit(f"▶ PDF-движок: {engine}")
-                extra.append(f"--pdf-engine={engine}")
-                # доступ к локальным картинкам (требование wkhtmltopdf 0.12.6)
-                extra.append("--pdf-engine-opt=--enable-local-file-access")
-                if self._margin:
-                    for side in ("top", "right", "bottom", "left"):
-                        extra += ["-V", f"margin-{side}={self._margin}"]
-            elif self._writer == "pdf":
+            if self._writer == "pdf":
                 engine = pdf_helper.find_pdf_engine()
                 if engine is None:
                     log.warning("Pandoc: PDF-движок не найден")
@@ -170,6 +159,48 @@ class _ConvertWorker(QThread):
                     "и повторите попытку."
                 )
             self.done.emit(False)
+
+    def _convert_via_chromium(self) -> None:
+        """PDF через Chromium: pandoc делает самодостаточный HTML, Chromium печатает."""
+        import tempfile
+        import chromium_pdf
+        import pypandoc
+
+        if not chromium_pdf.available():
+            log.warning("Pandoc: Chromium/Playwright не установлен")
+            self.log.emit("✗ Движок Chromium не установлен.")
+            self.log.emit("ℹ Установите его в диалоге «Компоненты».")
+            self.done.emit(False)
+            return
+
+        in_ext = Path(self._input).suffix.lower()
+        tmp_html = None
+        try:
+            if in_ext in (".html", ".htm"):
+                html_path = self._input
+            else:
+                fd, tmp_html = tempfile.mkstemp(suffix=".html")
+                os.close(fd)
+                pypandoc.convert_file(
+                    self._input, "html", outputfile=tmp_html,
+                    extra_args=["--standalone", "--embed-resources"],
+                )
+                html_path = tmp_html
+            self.log.emit("▶ PDF-движок: Chromium")
+            chromium_pdf.html_to_pdf(html_path, self._output, self._margin)
+            log.info("Pandoc/Chromium: готово → %s", self._output)
+            self.log.emit(f"✓ Готово → {self._output}")
+            self.done.emit(True)
+        except Exception as e:
+            log.exception("Chromium: ошибка конвертации %s → %s", self._input, self._output)
+            self.log.emit(f"✗ Ошибка Chromium: {e}")
+            self.done.emit(False)
+        finally:
+            if tmp_html and os.path.exists(tmp_html):
+                try:
+                    os.remove(tmp_html)
+                except OSError:
+                    pass
 
     def _relativize_media_paths(self, media_dir: str) -> None:
         """Заменяет абсолютные пути к картинкам на относительные.
@@ -269,7 +300,7 @@ class PandocTab(QWidget):
         pdf_row.addWidget(QLabel("PDF — движок:"))
         self._engine_combo = QComboBox()
         self._engine_combo.addItem("xelatex (LaTeX)", "latex")
-        self._engine_combo.addItem("wkhtmltopdf (как веб-страница)", "wkhtml")
+        self._engine_combo.addItem("Chromium (как браузер)", "chromium")
         pdf_row.addWidget(self._engine_combo)
         pdf_row.addWidget(QLabel("поля:"))
         self._margin_edit = QLineEdit("2cm")
@@ -298,6 +329,9 @@ class PandocTab(QWidget):
     def _toggle_settings(self, checked: bool) -> None:
         self._settings_box.setVisible(checked)
         self._settings_btn.setText("Настройки ▾" if checked else "Настройки ▸")
+        window = self.window()
+        if window is not None:
+            window.adjustSize()
 
     def _update_pdf_controls(self) -> None:
         """Движок и поля активны только для формата PDF."""

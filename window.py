@@ -16,14 +16,15 @@ class MainWindow(QMainWindow):
     def __init__(self, log_file: Path | None = None) -> None:
         super().__init__()
         self.setWindowTitle("DocForge")
-        # фиксированный размер — окно одинаково на всех вкладках; лог и настройки
-        # разворачиваются внутри окна, не меняя его габаритов
-        self.setFixedSize(640, 500)
+        # ширина фиксирована (одинаково на всех вкладках), высота подстраивается
+        # под содержимое — без больших пустот при скрытом логе/настройках
+        self.setFixedWidth(640)
 
         tabs = QTabWidget()
         tabs.addTab(MarkItDownTab(), "MarkItDown")
         tabs.addTab(PandocTab(), "Pandoc")
         tabs.addTab(ImagesTab(), "Изображения")
+        tabs.currentChanged.connect(lambda *_: self.adjustSize())
 
         # кнопка управления компонентами — всегда видна в углу таб-бара
         components_btn = QPushButton("Компоненты")
@@ -40,6 +41,7 @@ class MainWindow(QMainWindow):
             link.setToolTip("Открыть папку с логами")
             link.linkActivated.connect(self._open_log_dir)
             self.statusBar().addWidget(link)
+        self.adjustSize()
         log.debug("MainWindow создан")
 
     def _open_components(self) -> None:

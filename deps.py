@@ -12,6 +12,7 @@ from PyQt6.QtWidgets import (
     QMessageBox, QProgressBar, QPushButton, QVBoxLayout,
 )
 
+import chromium_pdf
 import ffmpeg_helper
 import pdf_helper
 
@@ -56,12 +57,12 @@ class _SetupWorker(QThread):
     status = pyqtSignal(str)
     done   = pyqtSignal(bool, str)
 
-    def __init__(self, core: bool, ffmpeg: bool, miktex: bool, wkhtmltopdf: bool) -> None:
+    def __init__(self, core: bool, ffmpeg: bool, miktex: bool, chromium: bool) -> None:
         super().__init__()
-        self._core        = core
-        self._ffmpeg      = ffmpeg
-        self._miktex      = miktex
-        self._wkhtmltopdf = wkhtmltopdf
+        self._core     = core
+        self._ffmpeg   = ffmpeg
+        self._miktex   = miktex
+        self._chromium = chromium
 
     def _winget(self, package_id: str) -> None:
         if shutil.which("winget") is None:
@@ -86,8 +87,8 @@ class _SetupWorker(QThread):
         )
 
     def run(self) -> None:
-        log.info("Настройка: ядро=%s, ffmpeg=%s, miktex=%s, wkhtmltopdf=%s",
-                 self._core, self._ffmpeg, self._miktex, self._wkhtmltopdf)
+        log.info("Настройка: ядро=%s, ffmpeg=%s, miktex=%s, chromium=%s",
+                 self._core, self._ffmpeg, self._miktex, self._chromium)
         try:
             if self._core:
                 if not _markitdown_installed():
@@ -95,6 +96,8 @@ class _SetupWorker(QThread):
                     self._pip("markitdown[all]")
                 self.status.emit("Установка pypandoc с pypi.org...")
                 self._pip("pypandoc")
+                self.status.emit("Установка PyMuPDF с pypi.org...")
+                self._pip("pymupdf")
                 if not _pandoc_installed():
                     self.status.emit("Загрузка Pandoc с github.com/jgm/pandoc (может занять минуту)...")
                     import pypandoc
@@ -113,9 +116,16 @@ class _SetupWorker(QThread):
                 if engine:
                     pdf_helper.ensure_autoinstall(engine)
 
-            if self._wkhtmltopdf:
-                self.status.emit("Установка wkhtmltopdf через winget...")
-                self._winget("wkhtmltopdf.wkhtmltox")
+            if self._chromium:
+                self.status.emit("Установка Playwright с pypi.org...")
+                self._pip("playwright")
+                self.status.emit("Загрузка Chromium (~150 МБ, может занять несколько минут)...")
+                subprocess.check_call(
+                    [sys.executable, "-m", "playwright", "install", "chromium"],
+                    stdout=subprocess.DEVNULL,
+                    stderr=subprocess.DEVNULL,
+                    creationflags=_NO_WINDOW,
+                )
         except Exception as e:
             log.exception("Настройка: ошибка установки компонентов")
             self.done.emit(False, str(e))
@@ -135,8 +145,8 @@ class SetupDialog(QDialog):
 
         core_ok   = _markitdown_installed() and _pandoc_installed()
         ffmpeg_ok = ffmpeg_helper.find_ffmpeg() is not None
-        miktex_ok = pdf_helper.find_pdf_engine() is not None
-        wkhtml_ok = pdf_helper.find_wkhtmltopdf() is not None
+        miktex_ok   = pdf_helper.find_pdf_engine() is not None
+        chromium_ok = chromium_pdf.available()
 
         layout = QVBoxLayout(self)
         layout.setContentsMargins(20, 16, 20, 16)
@@ -168,11 +178,11 @@ class SetupDialog(QDialog):
             "winget: MiKTeX.MiKTeX, источник miktex.org (~250 МБ)",
             installed=miktex_ok, required=False,
         )
-        self._chk_wkhtml = self._add_row(
+        self._chk_chromium = self._add_row(
             layout,
-            "wkhtmltopdf — PDF «как веб-страница» (браузерный движок)",
-            "winget: wkhtmltopdf.wkhtmltox (~70 МБ)",
-            installed=wkhtml_ok, required=False,
+            "Chromium — PDF «как браузер» во вкладке Pandoc",
+            "pypi.org/project/playwright + браузер Chromium (~150 МБ)",
+            installed=chromium_ok, required=False,
         )
 
         layout.addSpacing(8)
@@ -185,7 +195,7 @@ class SetupDialog(QDialog):
         self._bar.hide()
         layout.addWidget(self._bar)
 
-        nothing_to_install = core_ok and ffmpeg_ok and miktex_ok and wkhtml_ok
+        nothing_to_install = core_ok and ffmpeg_ok and miktex_ok and chromium_ok
         if nothing_to_install:
             self._btn = QPushButton("Продолжить" if first_run else "Закрыть")
         else:
@@ -220,21 +230,21 @@ class SetupDialog(QDialog):
         return chk
 
     def _start(self) -> None:
-        core   = not self._chk_core.property("installed")
-        ffmpeg = self._chk_ffmpeg.isChecked() and not self._chk_ffmpeg.property("installed")
-        miktex = self._chk_miktex.isChecked() and not self._chk_miktex.property("installed")
-        wkhtml = self._chk_wkhtml.isChecked() and not self._chk_wkhtml.property("installed")
+        core     = not self._chk_core.property("installed")
+        ffmpeg   = self._chk_ffmpeg.isChecked() and not self._chk_ffmpeg.property("installed")
+        miktex   = self._chk_miktex.isChecked() and not self._chk_miktex.property("installed")
+        chromium = self._chk_chromium.isChecked() and not self._chk_chromium.property("installed")
 
-        if not (core or ffmpeg or miktex or wkhtml):
+        if not (core or ffmpeg or miktex or chromium):
             self._finish()
             return
 
-        for chk in (self._chk_core, self._chk_ffmpeg, self._chk_miktex, self._chk_wkhtml):
+        for chk in (self._chk_core, self._chk_ffmpeg, self._chk_miktex, self._chk_chromium):
             chk.setEnabled(False)
         self._btn.setEnabled(False)
         self._bar.show()
 
-        self._worker = _SetupWorker(core, ffmpeg, miktex, wkhtml)
+        self._worker = _SetupWorker(core, ffmpeg, miktex, chromium)
         self._worker.status.connect(self._status.setText)
         self._worker.done.connect(self._on_done)
         self._worker.start()

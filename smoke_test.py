@@ -39,6 +39,7 @@ def check(name: str, fn) -> None:
 def t_imports():
     import deps, ffmpeg_helper, window, tab_markitdown, tab_pandoc  # noqa
     import tab_images, image_extract, file_filters, logging_setup, ui_utils  # noqa
+    import chromium_pdf  # noqa
 check("Импорт всех модулей приложения", t_imports)
 
 # 2. Pandoc установлен
@@ -91,25 +92,14 @@ try:
 except Exception as e:
     results.append((FAIL, f"Pandoc: md → .pdf — {e}"))
 
-# 4b. Pandoc: PDF через wkhtmltopdf (если установлен)
-def t_pdf_wkhtml():
-    import pypandoc
-    import pdf_helper
-    engine = pdf_helper.find_wkhtmltopdf()
-    if engine is None:
-        results.append((SKIP, "Pandoc: md → .pdf через wkhtmltopdf — не установлен"))
-        return
-    out = os.path.join(tmp, "out_wk.pdf")
-    extra = [f"--pdf-engine={engine}", "--pdf-engine-opt=--enable-local-file-access"]
-    for side in ("top", "right", "bottom", "left"):
-        extra += ["-V", f"margin-{side}=1cm"]
-    pypandoc.convert_file(src_md, "pdf", outputfile=out, extra_args=extra)
-    assert os.path.getsize(out) > 0
-    results.append((PASS, "Pandoc: md → .pdf через wkhtmltopdf"))
-try:
-    t_pdf_wkhtml()
-except Exception as e:
-    results.append((FAIL, f"Pandoc: md → .pdf через wkhtmltopdf — {e}"))
+# 4b. Chromium-движок: доступность (информационно)
+def t_chromium():
+    import chromium_pdf
+    if chromium_pdf.available():
+        results.append((PASS, "Chromium (Playwright): доступен"))
+    else:
+        results.append((SKIP, "Chromium (Playwright): не установлен (опционально)"))
+t_chromium()
 
 # 5. Pandoc: обратное направление docx → md
 def t_docx_to_md():
@@ -224,6 +214,26 @@ def t_images_only():
     assert count >= 1, f"картинки не извлечены (count={count})"
     assert os.path.isdir(dest) and os.listdir(dest), "папка назначения пуста"
 check("Изображения: извлечение из docx в выбранную папку", t_images_only)
+
+# 10c. Извлечение изображений из PDF (PyMuPDF)
+def t_pdf_images():
+    import fitz  # PyMuPDF
+    import image_extract
+    # валидную картинку генерируем самим PyMuPDF
+    pix = fitz.Pixmap(fitz.csRGB, fitz.IRect(0, 0, 40, 40))
+    pix.clear_with(128)
+    img_bytes = pix.tobytes("png")
+    pdf = os.path.join(tmp, "with_img.pdf")
+    doc = fitz.open()
+    page = doc.new_page()
+    page.insert_image(fitz.Rect(40, 40, 160, 160), stream=img_bytes)
+    doc.save(pdf)
+    doc.close()
+    dest = os.path.join(tmp, "pdf_картинки")
+    count = image_extract.extract_images_only(pdf, dest)
+    assert count >= 1, f"картинки из PDF не извлечены (count={count})"
+    assert os.path.isdir(dest) and os.listdir(dest), "папка пуста"
+check("Изображения: извлечение из PDF (PyMuPDF)", t_pdf_images)
 
 # 10c. Опции Pandoc: оглавление + нумерация разделов в html
 def t_pandoc_options():

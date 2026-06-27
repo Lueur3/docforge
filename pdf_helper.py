@@ -18,12 +18,6 @@ _MIKTEX_DIRS = [
 # xelatex первым — pdflatex не справляется с кириллицей в Unicode-документах
 _ENGINES = ("xelatex", "lualatex", "pdflatex", "tectonic")
 
-# wkhtmltopdf — браузерный (WebKit) движок: PDF выглядит как веб-страница
-_WKHTMLTOPDF_DIRS = [
-    r"C:\Program Files\wkhtmltopdf\bin",
-    r"C:\Program Files (x86)\wkhtmltopdf\bin",
-]
-
 # не показывать окно консоли при запуске из pythonw (GUI без терминала)
 _NO_WINDOW = subprocess.CREATE_NO_WINDOW if sys.platform == "win32" else 0
 
@@ -44,21 +38,6 @@ def find_pdf_engine() -> Optional[str]:
                 log.info("PDF-движок найден: %s", candidate)
                 return candidate
     log.info("PDF-движок не найден (проверены PATH и %s)", dirs)
-    return None
-
-
-def find_wkhtmltopdf() -> Optional[str]:
-    """Возвращает путь к wkhtmltopdf или None (PATH + стандартные папки)."""
-    path = shutil.which("wkhtmltopdf")
-    if path:
-        log.info("wkhtmltopdf найден в PATH: %s", path)
-        return path
-    for d in _WKHTMLTOPDF_DIRS:
-        candidate = os.path.join(d, "wkhtmltopdf.exe")
-        if os.path.isfile(candidate):
-            log.info("wkhtmltopdf найден: %s", candidate)
-            return candidate
-    log.info("wkhtmltopdf не найден")
     return None
 
 

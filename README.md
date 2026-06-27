@@ -31,8 +31,9 @@ syntax-highlighting style for code.
 For PDF output you can pick the engine and the page margins (default `2cm`, editable):
 
 - **xelatex** (LaTeX) — classic typesetting, great for formulas; handles Cyrillic
-- **wkhtmltopdf** — renders like a browser, so the PDF looks like a web page
-  (closer to VS Code's *Markdown Preview Enhanced*); install it from the **Components** dialog
+- **Chromium** — renders through a real Chromium browser (the same engine family as
+  Puppeteer in VS Code's *Markdown Preview Enhanced*), so the PDF looks like a web page;
+  install it from the **Components** dialog
 
 | Output format | Extension |
 |---|---|
@@ -53,7 +54,8 @@ For PDF output you can pick the engine and the page margins (default `2cm`, edit
 ### Images tab
 
 Extracts embedded images from a file (Word, PowerPoint, PDF, EPUB, etc.) into a
-folder of your choice, without producing any Markdown — just the images.
+folder of your choice, without producing any Markdown — just the images. PDF images
+are extracted with PyMuPDF; other formats via MarkItDown.
 
 ### General
 
@@ -116,12 +118,13 @@ on-the-fly package installation automatically, so the first PDF build pulls any
 missing LaTeX packages without prompting. The first PDF conversion may therefore
 take a minute while those packages download.
 
-### wkhtmltopdf — browser-style PDF
+### Chromium — browser-style PDF
 
-An alternative PDF engine that renders through a WebKit browser, so the PDF looks
-like a web page (full width, CSS layout) rather than a LaTeX document. Pick it in the
-Pandoc tab's **PDF — engine** dropdown. Installed from the **Components** dialog
-(`winget: wkhtmltopdf.wkhtmltox`).
+An alternative PDF engine that renders through a real Chromium browser (via Playwright,
+the same Chromium engine family as Puppeteer), so the PDF looks like a web page — full
+width, modern CSS — rather than a LaTeX document. Pick it in the Pandoc tab's
+**PDF — engine** dropdown. Installed from the **Components** dialog
+(`pip install playwright` plus a ~150 MB Chromium download).
 
 ---
 

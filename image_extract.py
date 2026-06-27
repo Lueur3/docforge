@@ -59,14 +59,42 @@ def extract_to_markdown_media(md_path: str) -> int:
     return count
 
 
-def extract_images_only(input_path: str, dest_dir: str) -> int:
-    """Извлекает изображения из файла в dest_dir через MarkItDown.
+def _extract_pdf_images(input_path: str, dest_dir: str) -> int:
+    """Извлекает встроенные изображения из PDF через PyMuPDF.
 
-    Markdown-результат не сохраняется — нужны только сами картинки.
+    MarkItDown из PDF достаёт только текст, поэтому для PDF нужен fitz.
     """
-    from markitdown import MarkItDown
+    import fitz  # PyMuPDF
+    dest = Path(dest_dir)
+    seen: set[int] = set()  # xref, чтобы не дублировать одну картинку
+    count = 0
+    with fitz.open(input_path) as doc:
+        for page_index in range(doc.page_count):
+            for img in doc.get_page_images(page_index):
+                xref = img[0]
+                if xref in seen:
+                    continue
+                seen.add(xref)
+                info = doc.extract_image(xref)
+                data, ext = info["image"], info["ext"]
+                count += 1
+                dest.mkdir(parents=True, exist_ok=True)
+                (dest / f"image{count}.{ext}").write_bytes(data)
+    return count
+
+
+def extract_images_only(input_path: str, dest_dir: str) -> int:
+    """Извлекает изображения из файла в dest_dir.
+
+    PDF — через PyMuPDF (fitz); остальные форматы — через MarkItDown
+    (base64 data-URI). Markdown-результат не сохраняется.
+    """
     log.info("Извлечение изображений: вход=%s → папка=%s", input_path, dest_dir)
-    result = MarkItDown().convert(input_path, keep_data_uris=True)
-    _, count = decode_data_uris(result.text_content, Path(dest_dir), rename_links=False)
+    if Path(input_path).suffix.lower() == ".pdf":
+        count = _extract_pdf_images(input_path, dest_dir)
+    else:
+        from markitdown import MarkItDown
+        result = MarkItDown().convert(input_path, keep_data_uris=True)
+        _, count = decode_data_uris(result.text_content, Path(dest_dir), rename_links=False)
     log.info("Извлечение изображений: сохранено %d файлов", count)
     return count

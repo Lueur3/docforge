@@ -100,8 +100,16 @@ class ImagesTab(QWidget):
 
     def _browse_dest(self) -> None:
         initial = self._dest_edit.text() or str(Path.home())
-        folder = QFileDialog.getExistingDirectory(self, "Выбрать папку", initial)
-        if folder:
+        folder = QFileDialog.getExistingDirectory(self, "Выбрать папку для сохранения", initial)
+        if not folder:
+            return
+        # выбирается родительская папка — имя <файл>_images добавляем сами,
+        # иначе пользователю пришлось бы дописывать его вручную
+        input_path = self._input_edit.text().strip()
+        if input_path:
+            name = Path(input_path).stem + "_images"
+            self._dest_edit.setText(str(Path(folder) / name))
+        else:
             self._dest_edit.setText(folder)
 
     def _run_extract(self) -> None:

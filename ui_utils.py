@@ -24,6 +24,7 @@ class LogPanel(QWidget):
 
         self._log = QTextEdit()
         self._log.setReadOnly(True)
+        self._log.setMinimumHeight(150)
         self._log.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
         self._log.hide()
         layout.addWidget(self._log)
@@ -35,6 +36,10 @@ class LogPanel(QWidget):
         self._log.setVisible(opened)
         self._btn.setChecked(opened)
         self._btn.setText("Скрыть лог ▾" if opened else "Показать лог ▸")
+        # окно подстраивает высоту под раскрытый/свёрнутый лог
+        window = self.window()
+        if window is not None:
+            window.adjustSize()
 
     def append(self, text: str) -> None:
         self._log.append(text)
