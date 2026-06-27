@@ -2,8 +2,9 @@ import logging
 import os
 import shutil
 import subprocess
-import sys
 from typing import Optional
+
+from docforge.proc import NO_WINDOW
 
 log = logging.getLogger(__name__)
 
@@ -17,9 +18,6 @@ _MIKTEX_DIRS = [
 
 # xelatex первым — pdflatex не справляется с кириллицей в Unicode-документах
 _ENGINES = ("xelatex", "lualatex", "pdflatex", "tectonic")
-
-# не показывать окно консоли при запуске из pythonw (GUI без терминала)
-_NO_WINDOW = subprocess.CREATE_NO_WINDOW if sys.platform == "win32" else 0
 
 _autoinstall_done = False
 
@@ -64,7 +62,7 @@ def ensure_autoinstall(engine_path: str) -> None:
     try:
         subprocess.run(
             [initexmf, "--set-config-value", "[MPM]AutoInstall=1"],
-            creationflags=_NO_WINDOW, timeout=60,
+            creationflags=NO_WINDOW, timeout=60,
             stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
         )
         _autoinstall_done = True

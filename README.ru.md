@@ -166,3 +166,33 @@ LaTeX-пакеты без запросов. Из-за этого первая к
 
 Путь к файлу лога показан в строке состояния внизу окна; кликните по нему, чтобы открыть
 папку. Если нужно сообщить о проблеме, приложите этот файл.
+
+---
+
+## Структура проекта
+
+```
+main.py                    лаунчер (запускается из DocForge.bat)
+smoke_test.py              офлайн-самопроверка всех путей конвертации
+docforge/
+  app.py                   точка входа: лог, тема, зависимости, окно
+  theme.py                 тёмная тема
+  logging_setup.py         запись лога в файл
+  proc.py                  общий флаг subprocess (без окна консоли)
+  core/                    логика, без UI
+    markitdown.py          файл → Markdown
+    pandoc.py              форматы/опции Pandoc (данные)
+    images.py              извлечение картинок (MarkItDown + PyMuPDF)
+    chromium.py            HTML → PDF через Playwright/Chromium
+    latex.py               поиск LaTeX-движка (MiKTeX)
+    ffmpeg.py              поиск ffmpeg
+    installer.py           проверка и установка зависимостей
+  ui/                      интерфейс PyQt6
+    window.py              главное окно
+    setup_dialog.py        диалог «Компоненты»
+    widgets.py             строка статуса + окно лога
+    file_filters.py        фильтры диалога «Обзор»
+    tabs/                  вкладки MarkItDown / Pandoc / Изображения
+  resources/app.ico        иконка приложения
+```
+

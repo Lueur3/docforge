@@ -9,9 +9,9 @@ from PyQt6.QtWidgets import (
 )
 from PyQt6.QtCore import QThread, pyqtSignal
 
-import file_filters
-import image_extract
-from ui_utils import StatusLog
+from docforge.core import images
+from docforge.ui import file_filters
+from docforge.ui.widgets import StatusLog
 
 log = logging.getLogger(__name__)
 
@@ -27,7 +27,7 @@ class _ExtractWorker(QThread):
 
     def run(self) -> None:
         try:
-            count = image_extract.extract_images_only(self._input, self._dest)
+            count = images.extract_images_only(self._input, self._dest)
             if count:
                 self.log.emit(f"✓ Извлечено изображений: {count} → {self._dest}")
             else:

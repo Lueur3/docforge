@@ -165,3 +165,33 @@ options, the tool used and its version — and full tracebacks for any error.
 
 The log file path is shown in the status bar at the bottom of the window; click it to open
 the folder. When reporting a problem, attach this file.
+
+---
+
+## Project structure
+
+```
+main.py                    launcher (run by DocForge.bat)
+smoke_test.py              offline self-test of all conversion paths
+docforge/
+  app.py                   entry point: logging, theme, deps, window
+  theme.py                 dark theme
+  logging_setup.py         file logging
+  proc.py                  shared subprocess flag (no console window)
+  core/                    logic, no UI
+    markitdown.py          file → Markdown
+    pandoc.py              Pandoc formats/options (data)
+    images.py              image extraction (MarkItDown + PyMuPDF)
+    chromium.py            HTML → PDF via Playwright/Chromium
+    latex.py               LaTeX engine discovery (MiKTeX)
+    ffmpeg.py              ffmpeg discovery
+    installer.py           dependency checks + install worker
+  ui/                      PyQt6 interface
+    window.py              main window
+    setup_dialog.py        Components dialog
+    widgets.py             status line + log window
+    file_filters.py        Browse-dialog filters
+    tabs/                  MarkItDown / Pandoc / Images tabs
+  resources/app.ico        application icon
+```
+

@@ -10,41 +10,12 @@ from PyQt6.QtWidgets import (
 )
 from PyQt6.QtCore import QThread, pyqtSignal
 
-import file_filters
-import pdf_helper
-from ui_utils import StatusLog
+from docforge.core import chromium, latex
+from docforge.core.pandoc import FORMATS, HIGHLIGHT_STYLES
+from docforge.ui import file_filters
+from docforge.ui.widgets import StatusLog
 
 log = logging.getLogger(__name__)
-
-# Стили подсветки кода Pandoc; "" — не передавать флаг (стиль по умолчанию)
-HIGHLIGHT_STYLES = [
-    ("По умолчанию", ""),
-    ("pygments", "pygments"),
-    ("tango", "tango"),
-    ("kate", "kate"),
-    ("monochrome", "monochrome"),
-    ("breezedark", "breezedark"),
-    ("espresso", "espresso"),
-    ("zenburn", "zenburn"),
-    ("haddock", "haddock"),
-    ("Без подсветки", "--no-highlight"),
-]
-
-
-# Форматы: (отображаемое имя, writer для pandoc, расширение, флаг --standalone)
-# Pandoc всегда читает и пишет UTF-8 — отдельные флаги кодировки не нужны.
-FORMATS: list[tuple[str, str, str, bool]] = [
-    ("Markdown",         "markdown", "md",   False),
-    ("HTML",             "html",     "html", True),
-    ("Word Document",    "docx",     "docx", False),
-    ("EPUB",             "epub",     "epub", True),
-    ("reStructuredText", "rst",      "rst",  False),
-    ("Plain Text",       "plain",    "txt",  False),
-    ("LaTeX",            "latex",    "tex",  True),
-    ("ODT",              "odt",      "odt",  False),
-    ("RTF",              "rtf",      "rtf",  True),
-    ("PDF",              "pdf",      "pdf",  False),
-]
 
 
 class _ConvertWorker(QThread):
@@ -84,7 +55,7 @@ class _ConvertWorker(QThread):
             extra = ["--standalone"] if self._standalone else []
 
             if self._writer == "pdf":
-                engine = pdf_helper.find_pdf_engine()
+                engine = latex.find_pdf_engine()
                 if engine is None:
                     log.warning("Pandoc: PDF-движок не найден")
                     self.log.emit("✗ Для вывода в PDF нужен LaTeX-движок.")
@@ -96,9 +67,9 @@ class _ConvertWorker(QThread):
                     return
                 log.info("Pandoc: PDF-движок=%s", engine)
                 self.log.emit(f"▶ PDF-движок: {engine}")
-                pdf_helper.ensure_autoinstall(engine)
+                latex.ensure_autoinstall(engine)
                 extra.append(f"--pdf-engine={engine}")
-                if pdf_helper.is_unicode_engine(engine):
+                if latex.is_unicode_engine(engine):
                     # системный шрифт с поддержкой кириллицы
                     extra += ["-V", "mainfont=Segoe UI"]
                 if self._margin:
@@ -163,10 +134,9 @@ class _ConvertWorker(QThread):
     def _convert_via_chromium(self) -> None:
         """PDF через Chromium: pandoc делает самодостаточный HTML, Chromium печатает."""
         import tempfile
-        import chromium_pdf
         import pypandoc
 
-        if not chromium_pdf.available():
+        if not chromium.available():
             log.warning("Pandoc: Chromium/Playwright не установлен")
             self.log.emit("✗ Движок Chromium не установлен.")
             self.log.emit("ℹ Установите его в диалоге «Компоненты».")
@@ -187,7 +157,7 @@ class _ConvertWorker(QThread):
                 )
                 html_path = tmp_html
             self.log.emit("▶ PDF-движок: Chromium")
-            chromium_pdf.html_to_pdf(html_path, self._output, self._margin)
+            chromium.html_to_pdf(html_path, self._output, self._margin)
             log.info("Pandoc/Chromium: готово → %s", self._output)
             self.log.emit(f"✓ Готово → {self._output}")
             self.done.emit(True)

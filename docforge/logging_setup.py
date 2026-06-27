@@ -11,6 +11,13 @@ LOG_FILE = LOG_DIR / "docforge.log"
 _FORMAT = "%(asctime)s | %(levelname)-7s | %(name)s.%(funcName)s:%(lineno)d | %(message)s"
 _DATEFMT = "%Y-%m-%d %H:%M:%S"
 
+# Сторонние библиотеки на DEBUG генерируют тысячи строк (особенно pdfminer
+# при чтении PDF) — это забивает лог и сильно замедляет конвертацию.
+_NOISY_LOGGERS = (
+    "pdfminer", "pdfplumber", "PIL", "fontTools", "markdown_it",
+    "urllib3", "charset_normalizer", "matplotlib", "comtypes",
+)
+
 
 def _log_environment(log: logging.Logger) -> None:
     import platform
@@ -18,7 +25,7 @@ def _log_environment(log: logging.Logger) -> None:
     log.info("DocForge — старт сессии")
     log.info("ОС: %s", platform.platform())
     log.info("Python: %s (%s)", platform.python_version(), sys.executable)
-    for pkg in ("PyQt6", "markitdown", "pypandoc", "imageio-ffmpeg"):
+    for pkg in ("PyQt6", "markitdown", "pypandoc", "pymupdf", "imageio-ffmpeg", "playwright"):
         try:
             log.info("Пакет %s: %s", pkg, version(pkg))
         except PackageNotFoundError:
@@ -55,11 +62,7 @@ def setup_logging() -> Path:
     file_handler.setFormatter(fmt)
     root.addHandler(file_handler)
 
-    # Сторонние библиотеки на DEBUG генерируют тысячи строк (особенно pdfminer
-    # при чтении PDF) — это забивает лог и сильно замедляет конвертацию.
-    # Глушим их до WARNING, наши модули остаются на DEBUG.
-    for noisy in ("pdfminer", "pdfplumber", "PIL", "fontTools", "markdown_it",
-                  "urllib3", "charset_normalizer", "matplotlib", "comtypes"):
+    for noisy in _NOISY_LOGGERS:
         logging.getLogger(noisy).setLevel(logging.WARNING)
 
     # консоль доступна только при запуске через python/DocForge-debug.bat;
