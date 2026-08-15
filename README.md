@@ -83,9 +83,15 @@ are extracted with PyMuPDF; other formats via MarkItDown.
 ```bash
 git clone https://github.com/Lueur3/docforge.git
 cd docforge
+python -m venv .venv
+.venv\Scripts\activate
 pip install -r requirements.txt
 python main.py
 ```
+
+A virtual environment is optional but recommended. Alternatively, install the package
+itself (`pip install -e .`) — `pyproject.toml` declares the dependencies and a `docforge`
+entry point.
 
 After that, launch the app by double-clicking **DocForge.bat**.
 If the app fails to start, run **DocForge-debug.bat** to see the error message.
@@ -170,7 +176,8 @@ the folder. When reporting a problem, attach this file.
 
 ```
 main.py                    launcher (run by DocForge.bat)
-smoke_test.py              offline self-test of all conversion paths
+pyproject.toml             package metadata, dependencies, ruff config
+tests/test_smoke.py        offline self-test of all conversion paths
 src/docforge/
   app.py                   entry point: logging, theme, deps, window
   theme.py                 dark theme

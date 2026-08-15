@@ -253,8 +253,34 @@ class PandocTab(QWidget):
         self._settings_btn.clicked.connect(self._toggle_settings)
         layout.addWidget(self._settings_btn)
 
-        self._settings_box = QWidget()
-        sbox = QVBoxLayout(self._settings_box)
+        self._settings_box = self._build_settings_box()
+        self._settings_box.hide()
+        layout.addWidget(self._settings_box)
+
+        # Кнопка конвертации
+        self._convert_btn = QPushButton("Конвертировать")
+        self._convert_btn.setObjectName("btn_convert")
+        self._convert_btn.setFixedHeight(36)
+        self._convert_btn.clicked.connect(self._run_convert)
+        layout.addWidget(self._convert_btn)
+
+        # строка статуса + «Подробнее»
+        self._log = StatusLog()
+        layout.addWidget(self._log)
+
+        # растяжка внизу прижимает содержимое вверх — без больших отступов
+        layout.addStretch()
+
+        # восстанавливаем последний формат (после того как combo заполнен)
+        _fi = self._fmt_combo.findData(settings.get_str("pandoc/format", "md"))
+        if _fi >= 0:
+            self._fmt_combo.setCurrentIndex(_fi)
+        self._update_pdf_controls()
+
+    def _build_settings_box(self) -> QWidget:
+        """Собирает свёрнутую панель настроек (опции Pandoc + параметры PDF)."""
+        box = QWidget()
+        sbox = QVBoxLayout(box)
         sbox.setContentsMargins(0, 0, 0, 0)
         sbox.setSpacing(6)
 
@@ -306,29 +332,7 @@ class PandocTab(QWidget):
         pdf_row.addWidget(self._margin_edit)
         pdf_row.addStretch()
         sbox.addLayout(pdf_row)
-
-        self._settings_box.hide()
-        layout.addWidget(self._settings_box)
-
-        # Кнопка конвертации
-        self._convert_btn = QPushButton("Конвертировать")
-        self._convert_btn.setObjectName("btn_convert")
-        self._convert_btn.setFixedHeight(36)
-        self._convert_btn.clicked.connect(self._run_convert)
-        layout.addWidget(self._convert_btn)
-
-        # строка статуса + «Подробнее»
-        self._log = StatusLog()
-        layout.addWidget(self._log)
-
-        # растяжка внизу прижимает содержимое вверх — без больших отступов
-        layout.addStretch()
-
-        # восстанавливаем последний формат (после того как combo заполнен)
-        _fi = self._fmt_combo.findData(settings.get_str("pandoc/format", "md"))
-        if _fi >= 0:
-            self._fmt_combo.setCurrentIndex(_fi)
-        self._update_pdf_controls()
+        return box
 
     def _toggle_settings(self, checked: bool) -> None:
         self._settings_box.setVisible(checked)

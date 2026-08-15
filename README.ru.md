@@ -83,9 +83,14 @@ PyMuPDF, из остальных форматов — через MarkItDown.
 ```bash
 git clone https://github.com/Lueur3/docforge.git
 cd docforge
+python -m venv .venv
+.venv\Scripts\activate
 pip install -r requirements.txt
 python main.py
 ```
+
+Виртуальное окружение необязательно, но рекомендуется. Как вариант — установить сам пакет
+(`pip install -e .`): `pyproject.toml` описывает зависимости и точку входа `docforge`.
 
 Дальше запускайте приложение двойным кликом по **DocForge.bat**.
 Если приложение не запускается, запустите **DocForge-debug.bat** — он покажет текст ошибки.
@@ -171,7 +176,8 @@ PDF выглядит как веб-страница — вся ширина, с�
 
 ```
 main.py                    лаунчер (запускается из DocForge.bat)
-smoke_test.py              офлайн-самопроверка всех путей конвертации
+pyproject.toml             метаданные пакета, зависимости, конфиг ruff
+tests/test_smoke.py        офлайн-самопроверка всех путей конвертации
 src/docforge/
   app.py                   точка входа: лог, тема, зависимости, окно
   theme.py                 тёмная тема

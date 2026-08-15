@@ -1,0 +1,40 @@
+[build-system]
+requires = ["setuptools>=64"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "docforge"
+version = "1.0.0"
+description = "Графическая обёртка над MarkItDown и Pandoc для конвертации документов"
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+    "PyQt6",
+    "markitdown[all]",
+    "pypandoc",
+    "pymupdf",
+]
+
+[project.optional-dependencies]
+ffmpeg = ["imageio-ffmpeg"]     # аудио/видео в MarkItDown
+chromium = ["playwright"]        # PDF через Chromium (+ python -m playwright install chromium)
+
+[project.scripts]
+docforge = "docforge.app:main"
+
+[tool.setuptools]
+package-dir = {"" = "src"}
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+docforge = ["resources/*.ico"]
+
+[tool.ruff]
+target-version = "py310"
+line-length = 100
+src = ["src"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "W", "UP", "B", "SIM"]
