@@ -1,3 +1,4 @@
+import contextlib
 import logging
 import os
 import urllib.parse
@@ -11,6 +12,7 @@ from PyQt6.QtWidgets import (
 from PyQt6.QtCore import QThread, pyqtSignal
 
 from docforge.core import chromium, latex
+from docforge.core.errors import friendly_error
 from docforge.core.pandoc import FORMATS, HIGHLIGHT_STYLES
 from docforge.ui import file_filters
 from docforge.ui.widgets import StatusLog
@@ -122,7 +124,7 @@ class _ConvertWorker(QThread):
                 "Pandoc: ошибка конвертации %s → %s (writer=%s)",
                 self._input, self._output, self._writer,
             )
-            self.log.emit(f"✗ Ошибка Pandoc: {error_msg}")
+            self.log.emit(f"✗ Ошибка Pandoc: {friendly_error(e)}")
             if self._writer == "pdf" and "package" in error_msg.lower():
                 self.log.emit(
                     "ℹ Похоже, MiKTeX не хватает LaTeX-пакетов. Откройте MiKTeX Console → "
@@ -163,14 +165,12 @@ class _ConvertWorker(QThread):
             self.done.emit(True)
         except Exception as e:
             log.exception("Chromium: ошибка конвертации %s → %s", self._input, self._output)
-            self.log.emit(f"✗ Ошибка Chromium: {e}")
+            self.log.emit(f"✗ Ошибка Chromium: {friendly_error(e)}")
             self.done.emit(False)
         finally:
             if tmp_html and os.path.exists(tmp_html):
-                try:
+                with contextlib.suppress(OSError):
                     os.remove(tmp_html)
-                except OSError:
-                    pass
 
     def _relativize_media_paths(self, media_dir: str) -> None:
         """Заменяет абсолютные пути к картинкам на относительные.

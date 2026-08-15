@@ -9,6 +9,7 @@ from PyQt6.QtWidgets import (
 )
 from PyQt6.QtCore import QThread, pyqtSignal
 
+from docforge.core.errors import friendly_error
 from docforge.core.markitdown import convert_to_markdown
 from docforge.ui import file_filters
 from docforge.ui.widgets import StatusLog
@@ -38,7 +39,7 @@ class _ConvertWorker(QThread):
             log.exception(
                 "MarkItDown: ошибка конвертации %s → %s", self._input, self._output
             )
-            self.log.emit(f"✗ Ошибка MarkItDown: {e}")
+            self.log.emit(f"✗ Ошибка MarkItDown: {friendly_error(e)}")
             self.done.emit(False)
 
 

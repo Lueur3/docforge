@@ -10,6 +10,7 @@ from PyQt6.QtWidgets import (
 from PyQt6.QtCore import QThread, pyqtSignal
 
 from docforge.core import images
+from docforge.core.errors import friendly_error
 from docforge.ui import file_filters
 from docforge.ui.widgets import StatusLog
 
@@ -35,7 +36,7 @@ class _ExtractWorker(QThread):
             self.done.emit(True)
         except Exception as e:
             log.exception("Извлечение изображений: ошибка для %s", self._input)
-            self.log.emit(f"✗ Ошибка: {e}")
+            self.log.emit(f"✗ Ошибка: {friendly_error(e)}")
             self.done.emit(False)
 
 
