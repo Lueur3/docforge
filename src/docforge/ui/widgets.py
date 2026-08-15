@@ -1,15 +1,36 @@
+import logging
+import os
+import subprocess
+from pathlib import Path
+
 from PyQt6.QtWidgets import (
     QWidget, QHBoxLayout, QVBoxLayout, QLabel, QPushButton, QTextEdit,
     QDialog, QSizePolicy,
 )
 
+log = logging.getLogger(__name__)
+
+
+def open_in_explorer(path: str) -> None:
+    """Открывает проводник: файл — выделенным, папку — как есть."""
+    p = Path(path)
+    try:
+        if p.is_file():
+            # выделяем файл в проводнике
+            subprocess.run(["explorer", "/select,", str(p)])
+        elif p.is_dir():
+            os.startfile(str(p))  # noqa: S606 — Windows, путь из результата конвертации
+        else:
+            os.startfile(str(p.parent))  # noqa: S606
+    except OSError as e:
+        log.warning("Не удалось открыть проводник для %s: %s", path, e)
+
 
 class StatusLog(QWidget):
-    """Однострочный статус + кнопка «Подробнее».
+    """Однострочный статус + кнопки «Папка» и «Подробнее».
 
-    В окне приложения видна только последняя строка (✓/✗/ℹ). Полный лог
-    конвертации открывается по кнопке в отдельном небольшом окне — главное
-    окно при этом не меняет размер.
+    В окне видна только последняя строка (✓/✗/ℹ). Полный лог открывается в
+    отдельном окне; кнопка «Папка» ведёт к результату последней конвертации.
     """
 
     def __init__(self) -> None:
@@ -22,15 +43,23 @@ class StatusLog(QWidget):
         self._status.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Preferred)
         self._status.setStyleSheet("color: #888; font-size: 11px;")
 
+        self._folder_btn = QPushButton("Папка")
+        self._folder_btn.setFixedWidth(70)
+        self._folder_btn.setToolTip("Открыть папку с результатом")
+        self._folder_btn.clicked.connect(self._open_result)
+        self._folder_btn.hide()
+
         self._btn = QPushButton("Подробнее")
         self._btn.setFixedWidth(90)
         self._btn.setToolTip("Открыть полный лог конвертации")
         self._btn.clicked.connect(self._show_details)
 
         row.addWidget(self._status, 1)
+        row.addWidget(self._folder_btn)
         row.addWidget(self._btn)
 
         self._lines: list[str] = []
+        self._result: str | None = None
         self._dialog: QDialog | None = None
         self._view: QTextEdit | None = None
 
@@ -45,6 +74,20 @@ class StatusLog(QWidget):
             self._status.setStyleSheet("color: #aaa; font-size: 11px;")
         if self._view is not None:
             self._view.append(text)
+
+    def reset(self) -> None:
+        """Сброс перед новой конвертацией: прячем кнопку «Папка»."""
+        self._result = None
+        self._folder_btn.hide()
+
+    def set_result(self, path: str) -> None:
+        """Показывает кнопку «Папка», ведущую к результату."""
+        self._result = path
+        self._folder_btn.show()
+
+    def _open_result(self) -> None:
+        if self._result:
+            open_in_explorer(self._result)
 
     def _show_details(self) -> None:
         if self._dialog is None:

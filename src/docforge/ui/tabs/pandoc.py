@@ -10,6 +10,7 @@ from PyQt6.QtWidgets import (
     QLineEdit, QPushButton, QFileDialog, QComboBox, QCheckBox,
 )
 from PyQt6.QtCore import QThread, pyqtSignal
+from PyQt6.QtGui import QKeySequence, QShortcut
 
 from docforge.core import chromium, latex
 from docforge.core.errors import friendly_error
@@ -198,7 +199,12 @@ class PandocTab(QWidget):
     def __init__(self) -> None:
         super().__init__()
         self._worker: Optional[_ConvertWorker] = None
+        self._last_output: str = ""
         self._build_ui()
+        self.setAcceptDrops(True)
+        QShortcut(QKeySequence("Ctrl+O"), self, self._browse_input)
+        QShortcut(QKeySequence("Ctrl+Return"), self, self._run_convert)
+        QShortcut(QKeySequence("Ctrl+Enter"), self, self._run_convert)
 
     def _build_ui(self) -> None:
         layout = QVBoxLayout(self)
@@ -212,6 +218,7 @@ class PandocTab(QWidget):
         self._input_edit.setPlaceholderText("Путь к файлу...")
         btn_in = QPushButton("Обзор")
         btn_in.setFixedWidth(80)
+        btn_in.setToolTip("Выбрать файл (Ctrl+O). Можно также перетащить файл в окно.")
         btn_in.clicked.connect(self._browse_input)
         row_in.addWidget(self._input_edit)
         row_in.addWidget(btn_in)
@@ -232,6 +239,7 @@ class PandocTab(QWidget):
         self._output_edit.setPlaceholderText("Путь к файлу результата...")
         btn_out = QPushButton("Обзор")
         btn_out.setFixedWidth(80)
+        btn_out.setToolTip("Куда сохранить результат")
         btn_out.clicked.connect(self._browse_output)
         row_out.addWidget(self._output_edit)
         row_out.addWidget(btn_out)
@@ -319,15 +327,28 @@ class PandocTab(QWidget):
     def _current_standalone(self) -> bool:
         return FORMATS[self._fmt_combo.currentIndex()][3]
 
+    def _set_input(self, path: str) -> None:
+        self._input_edit.setText(path)
+        # путь вывода всегда следует за новым входным файлом
+        self._output_edit.setText(str(Path(path).with_suffix(f".{self._current_ext()}")))
+
     def _browse_input(self) -> None:
         path, _ = QFileDialog.getOpenFileName(
             self, "Выбрать файл", "", file_filters.PANDOC_INPUT
         )
-        if not path:
-            return
-        self._input_edit.setText(path)
-        # путь вывода всегда следует за новым входным файлом
-        self._output_edit.setText(str(Path(path).with_suffix(f".{self._current_ext()}")))
+        if path:
+            self._set_input(path)
+
+    def dragEnterEvent(self, event) -> None:
+        if event.mimeData().hasUrls():
+            event.acceptProposedAction()
+
+    def dropEvent(self, event) -> None:
+        for url in event.mimeData().urls():
+            path = url.toLocalFile()
+            if path and os.path.isfile(path):
+                self._set_input(path)
+                break
 
     def _browse_output(self) -> None:
         ext = self._current_ext()
@@ -358,6 +379,8 @@ class PandocTab(QWidget):
             return
 
         self._convert_btn.setEnabled(False)
+        self._last_output = output_path
+        self._log.reset()
         self._log.append(f"▶ Конвертация в .{self._current_ext()}: {input_path}")
 
         highlight = HIGHLIGHT_STYLES[self._highlight_combo.currentIndex()][1]
@@ -373,5 +396,7 @@ class PandocTab(QWidget):
         self._worker.done.connect(self._on_done)
         self._worker.start()
 
-    def _on_done(self, _success: bool) -> None:
+    def _on_done(self, success: bool) -> None:
         self._convert_btn.setEnabled(True)
+        if success:
+            self._log.set_result(self._last_output)

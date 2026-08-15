@@ -8,6 +8,7 @@ from PyQt6.QtWidgets import (
     QLineEdit, QPushButton, QFileDialog, QCheckBox,
 )
 from PyQt6.QtCore import QThread, pyqtSignal
+from PyQt6.QtGui import QKeySequence, QShortcut
 
 from docforge.core.errors import friendly_error
 from docforge.core.markitdown import convert_to_markdown
@@ -47,7 +48,12 @@ class MarkItDownTab(QWidget):
     def __init__(self) -> None:
         super().__init__()
         self._worker: Optional[_ConvertWorker] = None
+        self._last_output: str = ""
         self._build_ui()
+        self.setAcceptDrops(True)
+        QShortcut(QKeySequence("Ctrl+O"), self, self._browse_input)
+        QShortcut(QKeySequence("Ctrl+Return"), self, self._run_convert)
+        QShortcut(QKeySequence("Ctrl+Enter"), self, self._run_convert)
 
     def _build_ui(self) -> None:
         layout = QVBoxLayout(self)
@@ -61,6 +67,7 @@ class MarkItDownTab(QWidget):
         self._input_edit.setPlaceholderText("Путь к файлу...")
         btn_in = QPushButton("Обзор")
         btn_in.setFixedWidth(80)
+        btn_in.setToolTip("Выбрать файл (Ctrl+O). Можно также перетащить файл в окно.")
         btn_in.clicked.connect(self._browse_input)
         row_in.addWidget(self._input_edit)
         row_in.addWidget(btn_in)
@@ -73,6 +80,7 @@ class MarkItDownTab(QWidget):
         self._output_edit.setPlaceholderText("Путь к файлу результата...")
         btn_out = QPushButton("Обзор")
         btn_out.setFixedWidth(80)
+        btn_out.setToolTip("Куда сохранить .md")
         btn_out.clicked.connect(self._browse_output)
         row_out.addWidget(self._output_edit)
         row_out.addWidget(btn_out)
@@ -97,15 +105,28 @@ class MarkItDownTab(QWidget):
         # растяжка внизу прижимает содержимое вверх — без больших отступов
         layout.addStretch()
 
+    def _set_input(self, path: str) -> None:
+        self._input_edit.setText(path)
+        # путь вывода всегда следует за новым входным файлом
+        self._output_edit.setText(str(Path(path).with_suffix(".md")))
+
     def _browse_input(self) -> None:
         path, _ = QFileDialog.getOpenFileName(
             self, "Выбрать файл", "", file_filters.MARKITDOWN_INPUT
         )
-        if not path:
-            return
-        self._input_edit.setText(path)
-        # путь вывода всегда следует за новым входным файлом
-        self._output_edit.setText(str(Path(path).with_suffix(".md")))
+        if path:
+            self._set_input(path)
+
+    def dragEnterEvent(self, event) -> None:
+        if event.mimeData().hasUrls():
+            event.acceptProposedAction()
+
+    def dropEvent(self, event) -> None:
+        for url in event.mimeData().urls():
+            path = url.toLocalFile()
+            if path and os.path.isfile(path):
+                self._set_input(path)
+                break
 
     def _browse_output(self) -> None:
         initial = self._output_edit.text() or str(Path.home())
@@ -127,6 +148,8 @@ class MarkItDownTab(QWidget):
             return
 
         self._convert_btn.setEnabled(False)
+        self._last_output = output_path
+        self._log.reset()
         self._log.append(f"▶ Конвертация: {input_path}")
 
         self._worker = _ConvertWorker(
@@ -136,5 +159,7 @@ class MarkItDownTab(QWidget):
         self._worker.done.connect(self._on_done)
         self._worker.start()
 
-    def _on_done(self, _success: bool) -> None:
+    def _on_done(self, success: bool) -> None:
         self._convert_btn.setEnabled(True)
+        if success:
+            self._log.set_result(self._last_output)
