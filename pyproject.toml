@@ -22,11 +22,8 @@ chromium = ["playwright"]        # PDF через Chromium (+ python -m playwrig
 [project.scripts]
 docforge = "docforge.app:main"
 
-[tool.setuptools]
-package-dir = {"" = "src"}
-
 [tool.setuptools.packages.find]
-where = ["src"]
+include = ["docforge*"]   # без этого setuptools захватил бы и tests/
 
 [tool.setuptools.package-data]
 docforge = ["resources/*.ico"]
@@ -34,7 +31,6 @@ docforge = ["resources/*.ico"]
 [tool.ruff]
 target-version = "py310"
 line-length = 100
-src = ["src"]
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "W", "UP", "B", "SIM"]

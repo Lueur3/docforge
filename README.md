@@ -178,7 +178,7 @@ the folder. When reporting a problem, attach this file.
 main.py                    launcher (run by DocForge.bat)
 pyproject.toml             package metadata, dependencies, ruff config
 tests/test_smoke.py        offline self-test of all conversion paths
-src/docforge/
+docforge/
   app.py                   entry point: logging, theme, deps, window
   theme.py                 dark theme
   logging_setup.py         file logging

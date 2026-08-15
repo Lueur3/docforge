@@ -178,7 +178,7 @@ PDF выглядит как веб-страница — вся ширина, с�
 main.py                    лаунчер (запускается из DocForge.bat)
 pyproject.toml             метаданные пакета, зависимости, конфиг ruff
 tests/test_smoke.py        офлайн-самопроверка всех путей конвертации
-src/docforge/
+docforge/
   app.py                   точка входа: лог, тема, зависимости, окно
   theme.py                 тёмная тема
   logging_setup.py         запись лога в файл
