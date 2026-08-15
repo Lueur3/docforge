@@ -12,6 +12,7 @@ from PyQt6.QtWidgets import (
 from PyQt6.QtCore import QThread, pyqtSignal
 from PyQt6.QtGui import QKeySequence, QShortcut
 
+from docforge import settings
 from docforge.core import chromium, latex
 from docforge.core.errors import friendly_error
 from docforge.core.pandoc import FORMATS, HIGHLIGHT_STYLES
@@ -261,13 +262,21 @@ class PandocTab(QWidget):
         opt_row = QHBoxLayout()
         opt_row.setSpacing(12)
         self._toc_chk = QCheckBox("Оглавление")
+        self._toc_chk.setChecked(settings.get_bool("pandoc/toc", False))
+        self._toc_chk.toggled.connect(lambda v: settings.put("pandoc/toc", v))
         self._numsec_chk = QCheckBox("Нумерация разделов")
+        self._numsec_chk.setChecked(settings.get_bool("pandoc/numsec", False))
+        self._numsec_chk.toggled.connect(lambda v: settings.put("pandoc/numsec", v))
         opt_row.addWidget(self._toc_chk)
         opt_row.addWidget(self._numsec_chk)
         opt_row.addWidget(QLabel("Подсветка кода:"))
         self._highlight_combo = QComboBox()
         for label, _value in HIGHLIGHT_STYLES:
             self._highlight_combo.addItem(label)
+        self._highlight_combo.setCurrentIndex(settings.get_int("pandoc/highlight", 0))
+        self._highlight_combo.currentIndexChanged.connect(
+            lambda i: settings.put("pandoc/highlight", i)
+        )
         opt_row.addWidget(self._highlight_combo)
         opt_row.addStretch()
         sbox.addLayout(opt_row)
@@ -280,11 +289,20 @@ class PandocTab(QWidget):
         # Chromium первым — движок PDF по умолчанию
         self._engine_combo.addItem("Chromium (как браузер)", "chromium")
         self._engine_combo.addItem("xelatex (LaTeX)", "latex")
+        _ei = self._engine_combo.findData(settings.get_str("pandoc/engine", "chromium"))
+        if _ei >= 0:
+            self._engine_combo.setCurrentIndex(_ei)
+        self._engine_combo.currentIndexChanged.connect(
+            lambda: settings.put("pandoc/engine", self._engine_combo.currentData())
+        )
         pdf_row.addWidget(self._engine_combo)
         pdf_row.addWidget(QLabel("поля:"))
-        self._margin_edit = QLineEdit("2cm")
+        self._margin_edit = QLineEdit(settings.get_str("pandoc/margin", "2cm"))
         self._margin_edit.setFixedWidth(70)
         self._margin_edit.setToolTip("Например: 2cm, 1.5cm, 1in, 20mm. Пусто — поля движка по умолчанию.")
+        self._margin_edit.editingFinished.connect(
+            lambda: settings.put("pandoc/margin", self._margin_edit.text().strip())
+        )
         pdf_row.addWidget(self._margin_edit)
         pdf_row.addStretch()
         sbox.addLayout(pdf_row)
@@ -306,6 +324,10 @@ class PandocTab(QWidget):
         # растяжка внизу прижимает содержимое вверх — без больших отступов
         layout.addStretch()
 
+        # восстанавливаем последний формат (после того как combo заполнен)
+        _fi = self._fmt_combo.findData(settings.get_str("pandoc/format", "md"))
+        if _fi >= 0:
+            self._fmt_combo.setCurrentIndex(_fi)
         self._update_pdf_controls()
 
     def _toggle_settings(self, checked: bool) -> None:
@@ -331,10 +353,11 @@ class PandocTab(QWidget):
         self._input_edit.setText(path)
         # путь вывода всегда следует за новым входным файлом
         self._output_edit.setText(str(Path(path).with_suffix(f".{self._current_ext()}")))
+        settings.remember_dir(path)
 
     def _browse_input(self) -> None:
         path, _ = QFileDialog.getOpenFileName(
-            self, "Выбрать файл", "", file_filters.PANDOC_INPUT
+            self, "Выбрать файл", settings.last_dir(), file_filters.PANDOC_INPUT
         )
         if path:
             self._set_input(path)
@@ -365,6 +388,7 @@ class PandocTab(QWidget):
             self._output_edit.setText(
                 str(Path(current).with_suffix(f".{self._current_ext()}"))
             )
+        settings.put("pandoc/format", self._current_ext())
         self._update_pdf_controls()
 
     def _run_convert(self) -> None:

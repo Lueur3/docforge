@@ -10,6 +10,7 @@ from PyQt6.QtWidgets import (
 from PyQt6.QtCore import QThread, pyqtSignal
 from PyQt6.QtGui import QKeySequence, QShortcut
 
+from docforge import settings
 from docforge.core.errors import friendly_error
 from docforge.core.markitdown import convert_to_markdown
 from docforge.ui import file_filters
@@ -86,9 +87,12 @@ class MarkItDownTab(QWidget):
         row_out.addWidget(btn_out)
         layout.addLayout(row_out)
 
-        # Извлечение картинок
+        # Извлечение картинок (состояние запоминается между запусками)
         self._extract_chk = QCheckBox("Извлекать изображения в папку рядом с файлом")
-        self._extract_chk.setChecked(True)
+        self._extract_chk.setChecked(settings.get_bool("markitdown/extract_images", True))
+        self._extract_chk.toggled.connect(
+            lambda v: settings.put("markitdown/extract_images", v)
+        )
         layout.addWidget(self._extract_chk)
 
         # Кнопка конвертации
@@ -109,10 +113,11 @@ class MarkItDownTab(QWidget):
         self._input_edit.setText(path)
         # путь вывода всегда следует за новым входным файлом
         self._output_edit.setText(str(Path(path).with_suffix(".md")))
+        settings.remember_dir(path)
 
     def _browse_input(self) -> None:
         path, _ = QFileDialog.getOpenFileName(
-            self, "Выбрать файл", "", file_filters.MARKITDOWN_INPUT
+            self, "Выбрать файл", settings.last_dir(), file_filters.MARKITDOWN_INPUT
         )
         if path:
             self._set_input(path)

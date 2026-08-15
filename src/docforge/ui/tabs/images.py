@@ -10,6 +10,7 @@ from PyQt6.QtWidgets import (
 from PyQt6.QtCore import QThread, pyqtSignal
 from PyQt6.QtGui import QKeySequence, QShortcut
 
+from docforge import settings
 from docforge.core import images
 from docforge.core.errors import friendly_error
 from docforge.ui import file_filters
@@ -104,10 +105,11 @@ class ImagesTab(QWidget):
         # путь назначения всегда следует за новым файлом: <имя>_images рядом с ним;
         # папка создаётся автоматически при извлечении — заранее создавать не нужно
         self._dest_edit.setText(str(Path(path).with_suffix("")) + "_images")
+        settings.remember_dir(path)
 
     def _browse_input(self) -> None:
         path, _ = QFileDialog.getOpenFileName(
-            self, "Выбрать файл", "", file_filters.IMAGES_INPUT
+            self, "Выбрать файл", settings.last_dir(), file_filters.IMAGES_INPUT
         )
         if path:
             self._set_input(path)
