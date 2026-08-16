@@ -4,7 +4,8 @@ from pathlib import Path
 
 from PyQt6.QtCore import pyqtSignal
 from PyQt6.QtWidgets import (
-    QFileDialog, QHBoxLayout, QLineEdit, QMenu, QPushButton, QWidget,
+    QFileDialog, QHBoxLayout, QLineEdit, QMenu, QPushButton, QStyle,
+    QToolButton, QWidget,
 )
 
 from docforge import settings
@@ -60,10 +61,17 @@ class InputSelector(QWidget):
         btn_dir.setToolTip("Взять все поддерживаемые файлы из папки")
         btn_dir.clicked.connect(self.browse_folder)
 
-        self._recent_btn = QPushButton("▾")
-        self._recent_btn.setFixedWidth(26)
+        # a style-drawn icon, not a font glyph: "▾" renders as nothing on some systems
+        self._recent_btn = QToolButton()
+        self._recent_btn.setIcon(
+            self.style().standardIcon(QStyle.StandardPixmap.SP_FileDialogDetailedView)
+        )
+        self._recent_btn.setPopupMode(QToolButton.ToolButtonPopupMode.InstantPopup)
+        self._recent_btn.setFixedSize(34, 26)
         self._recent_btn.setToolTip("Недавние файлы")
-        self._recent_btn.clicked.connect(self._show_recent)
+        self._recent_menu = QMenu(self)
+        self._recent_menu.aboutToShow.connect(self._fill_recent_menu)
+        self._recent_btn.setMenu(self._recent_menu)
 
         row.addWidget(self._edit)
         row.addWidget(btn_files)
@@ -88,21 +96,22 @@ class InputSelector(QWidget):
                 settings.push_recent(self._scope, self._paths)
         self.changed.emit()
 
-    def _show_recent(self) -> None:
-        """Drop-down with the last selections; missing files are marked."""
-        menu = QMenu(self)
+    def _fill_recent_menu(self) -> None:
+        """Rebuild the drop-down of last selections; missing files are marked."""
+        self._recent_menu.clear()
         entries = settings.get_recent(self._scope)
         if not entries:
-            menu.addAction("Пока пусто").setEnabled(False)
+            self._recent_menu.addAction("Пока пусто").setEnabled(False)
+            return
         for entry in entries:
             label = summarize(entry)
             if len(label) > 70:
                 label = "..." + label[-67:]
             if not all(os.path.exists(p) for p in entry):
                 label += "  (нет на диске)"
-            action = menu.addAction(label)
+            action = self._recent_menu.addAction(label)
+            action.setToolTip("\n".join(entry))
             action.triggered.connect(lambda _checked, e=entry: self.set_paths(e))
-        menu.exec(self._recent_btn.mapToGlobal(self._recent_btn.rect().bottomLeft()))
 
     def _on_text_edited(self) -> None:
         """A hand-typed path replaces the selection; the summary text is kept."""
