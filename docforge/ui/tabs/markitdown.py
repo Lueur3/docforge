@@ -38,7 +38,9 @@ class MarkItDownTab(QWidget):
 
         # Input files
         layout.addWidget(QLabel("Входные файлы:"))
-        self._inputs = InputSelector(file_filters.MARKITDOWN_INPUT, file_filters.MARKITDOWN_EXTS)
+        self._inputs = InputSelector(
+            file_filters.MARKITDOWN_INPUT, file_filters.MARKITDOWN_EXTS, "markitdown"
+        )
         self._inputs.changed.connect(self._on_inputs_changed)
         layout.addWidget(self._inputs)
 

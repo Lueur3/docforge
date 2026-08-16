@@ -23,7 +23,7 @@ class MainWindow(QMainWindow):
         # fixed size — identical on every tab and unchanged when settings are
         # toggled; the log lives in its own window, so there is no large panel
         # here, and each tab's trailing stretch pins its fields to the top
-        self.setFixedSize(640, 430)
+        self.setFixedSize(640, 460)
 
         self._tabs = QTabWidget()
         self._tabs.addTab(MarkItDownTab(), "MarkItDown")

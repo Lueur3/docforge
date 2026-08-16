@@ -15,6 +15,7 @@ Every tab works with one file or many:
 
 - **Обзор** selects several files at once; **Папка** takes every supported file in a folder
 - Files (or a whole folder) can be dropped onto the window
+- The **▾** button next to the input field reopens one of the last 10 selections
 - With one file selected you name the result exactly; with several you pick an output
   folder and names are derived from the sources
 - Progress is shown as "3 из 12"; the convert button turns into **Отмена** while a batch
@@ -54,6 +55,10 @@ Full bidirectional conversion between document formats via Pandoc.
 
 Options: table of contents (`--toc`), section numbering (`--number-sections`),
 syntax-highlighting style for code.
+
+**Presets** keep a named set of these settings. Three come with the app (print-ready PDF,
+Word document with a table of contents, Markdown for an LLM); your own are saved with
+**Сохранить** and removed with **Удалить** — the built-in ones are protected.
 
 For PDF output you can pick the engine and the page margins (default `2cm`, editable):
 
@@ -213,6 +218,7 @@ docforge/
     markitdown.py          file → Markdown
     pandoc.py              Pandoc formats/options + the conversion routine
     batch.py               job queue, worker pool, progress
+    presets.py             named Pandoc setting sets
     paths.py               free output names, path comparison
     errors.py              readable wording for file errors
     winintegration.py      Explorer verb + SendTo shortcut (HKCU)

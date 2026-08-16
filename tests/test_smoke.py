@@ -415,6 +415,53 @@ def t_file_handoff():
     w.close()  # tear the window down while Qt is still alive
 check("Передача файлов из Проводника на нужную вкладку", t_file_handoff)
 
+# 10l. Presets and recent files (kept in a temp store, real settings untouched)
+def t_presets_and_recent():
+    import tempfile as _tf
+    from PyQt6.QtCore import QSettings
+    qt_app()
+    from docforge import settings as S
+    from docforge.core import presets
+
+    original = S._s
+    store = _tf.mktemp(suffix=".ini")
+    S._s = lambda: QSettings(store, QSettings.Format.IniFormat)
+    try:
+        assert len(presets.BUILTIN) >= 3, "встроенных пресетов слишком мало"
+        presets.save("Тест", presets.Preset(format="docx", toc=True, margin="1cm"))
+        loaded = presets.all_presets()["Тест"]
+        assert loaded.format == "docx" and loaded.toc and loaded.margin == "1cm", loaded
+        for name in list(presets.BUILTIN)[:1]:
+            try:
+                presets.save(name, presets.Preset())
+                raise AssertionError("встроенный пресет позволили перезаписать")
+            except ValueError:
+                pass
+            try:
+                presets.delete(name)
+                raise AssertionError("встроенный пресет позволили удалить")
+            except ValueError:
+                pass
+        presets.delete("Тест")
+        assert "Тест" not in presets.all_presets(), "пресет не удалён"
+
+        # recent: newest first, repeats float up, capped
+        S.push_recent("t", ["a.md"])
+        S.push_recent("t", ["b.md", "c.md"])
+        S.push_recent("t", ["a.md"])
+        rec = S.get_recent("t")
+        assert rec[0] == ["a.md"], f"повтор не всплыл: {rec}"
+        assert len(rec) == 2, f"дубликат не схлопнулся: {rec}"
+        for i in range(S.RECENT_LIMIT + 5):
+            S.push_recent("t", [f"f{i}.md"])
+        assert len(S.get_recent("t")) == S.RECENT_LIMIT, "лимит недавних не соблюдён"
+        # corrupted data must not crash the app
+        S.put("recent/t", "не json")
+        assert S.get_recent("t") == [], "повреждённые данные не обработаны"
+    finally:
+        S._s = original
+check("Пресеты и список недавних файлов", t_presets_and_recent)
+
 # 11. ffmpeg status (informational)
 def t_ffmpeg():
     from docforge.core import ffmpeg as ffmpeg_helper

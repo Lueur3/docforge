@@ -5,12 +5,12 @@ from typing import Optional
 
 from PyQt6.QtGui import QKeySequence, QShortcut
 from PyQt6.QtWidgets import (
-    QCheckBox, QComboBox, QFileDialog, QHBoxLayout, QLabel, QLineEdit,
-    QPushButton, QVBoxLayout, QWidget,
+    QCheckBox, QComboBox, QFileDialog, QHBoxLayout, QInputDialog, QLabel,
+    QLineEdit, QMessageBox, QPushButton, QVBoxLayout, QWidget,
 )
 
 from docforge import settings
-from docforge.core import pandoc
+from docforge.core import pandoc, presets
 from docforge.core.batch import BatchRunner, Job, pool_size
 from docforge.core.pandoc import FORMATS, HIGHLIGHT_STYLES, PandocOptions
 from docforge.ui import file_filters
@@ -39,7 +39,9 @@ class PandocTab(QWidget):
 
         # Input files
         layout.addWidget(QLabel("Входные файлы:"))
-        self._inputs = InputSelector(file_filters.PANDOC_INPUT, file_filters.PANDOC_EXTS)
+        self._inputs = InputSelector(
+            file_filters.PANDOC_INPUT, file_filters.PANDOC_EXTS, "pandoc"
+        )
         self._inputs.changed.connect(self._on_inputs_changed)
         layout.addWidget(self._inputs)
 
@@ -103,6 +105,26 @@ class PandocTab(QWidget):
         sbox.setContentsMargins(0, 0, 0, 0)
         sbox.setSpacing(6)
 
+        # Presets: named sets of the settings below
+        preset_row = QHBoxLayout()
+        preset_row.setSpacing(6)
+        preset_row.addWidget(QLabel("Пресет:"))
+        self._preset_combo = QComboBox()
+        self._preset_combo.setToolTip("Готовый набор настроек — применяется при выборе")
+        self._preset_combo.currentIndexChanged.connect(self._on_preset_selected)
+        preset_row.addWidget(self._preset_combo, 1)
+        save_btn = QPushButton("Сохранить")
+        save_btn.setFixedWidth(90)
+        save_btn.setToolTip("Сохранить текущие настройки как пресет")
+        save_btn.clicked.connect(self._save_preset)
+        del_btn = QPushButton("Удалить")
+        del_btn.setFixedWidth(80)
+        del_btn.setToolTip("Удалить выбранный пресет (встроенные удалить нельзя)")
+        del_btn.clicked.connect(self._delete_preset)
+        preset_row.addWidget(save_btn)
+        preset_row.addWidget(del_btn)
+        sbox.addLayout(preset_row)
+
         # Pandoc options
         opt_row = QHBoxLayout()
         opt_row.setSpacing(12)
@@ -153,7 +175,86 @@ class PandocTab(QWidget):
         pdf_row.addWidget(self._margin_edit)
         pdf_row.addStretch()
         sbox.addLayout(pdf_row)
+
+        self._reload_presets()
         return box
+
+    # -------------------------------------------------------------- presets
+
+    def _reload_presets(self, select: str = "") -> None:
+        """Refill the preset list; `select` picks an entry afterwards."""
+        self._applying_preset = True
+        self._preset_combo.clear()
+        self._preset_combo.addItem("— не выбран —", "")
+        for name in presets.all_presets():
+            self._preset_combo.addItem(name, name)
+        if select:
+            idx = self._preset_combo.findData(select)
+            if idx >= 0:
+                self._preset_combo.setCurrentIndex(idx)
+        self._applying_preset = False
+
+    def _on_preset_selected(self) -> None:
+        if getattr(self, "_applying_preset", False):
+            return
+        name = self._preset_combo.currentData()
+        if not name:
+            return
+        preset = presets.all_presets().get(name)
+        if preset is None:
+            return
+        log.info("Применяется пресет: %s", name)
+
+        idx = self._fmt_combo.findData(preset.format)
+        if idx >= 0:
+            self._fmt_combo.setCurrentIndex(idx)
+        self._toc_chk.setChecked(preset.toc)
+        self._numsec_chk.setChecked(preset.number_sections)
+        h_idx = next(
+            (i for i, (_label, value) in enumerate(HIGHLIGHT_STYLES) if value == preset.highlight),
+            0,
+        )
+        self._highlight_combo.setCurrentIndex(h_idx)
+        e_idx = self._engine_combo.findData(preset.engine)
+        if e_idx >= 0:
+            self._engine_combo.setCurrentIndex(e_idx)
+        self._margin_edit.setText(preset.margin)
+        settings.put("pandoc/margin", preset.margin)
+
+    def _current_preset(self) -> presets.Preset:
+        return presets.Preset(
+            format=self._current_ext(),
+            toc=self._toc_chk.isChecked(),
+            number_sections=self._numsec_chk.isChecked(),
+            highlight=HIGHLIGHT_STYLES[self._highlight_combo.currentIndex()][1],
+            engine=self._engine_combo.currentData(),
+            margin=self._margin_edit.text().strip(),
+        )
+
+    def _save_preset(self) -> None:
+        suggested = self._preset_combo.currentData() or ""
+        if presets.is_builtin(suggested):
+            suggested = ""
+        name, ok = QInputDialog.getText(self, "Сохранить пресет", "Название:", text=suggested)
+        if not ok:
+            return
+        try:
+            presets.save(name, self._current_preset())
+        except ValueError as e:
+            QMessageBox.warning(self, "Пресет не сохранён", str(e))
+            return
+        self._reload_presets(select=name.strip())
+
+    def _delete_preset(self) -> None:
+        name = self._preset_combo.currentData()
+        if not name:
+            return
+        try:
+            presets.delete(name)
+        except ValueError as e:
+            QMessageBox.warning(self, "Пресет не удалён", str(e))
+            return
+        self._reload_presets()
 
     def _toggle_settings(self, checked: bool) -> None:
         self._settings_box.setVisible(checked)

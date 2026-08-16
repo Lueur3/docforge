@@ -4,7 +4,7 @@ from pathlib import Path
 
 from PyQt6.QtCore import pyqtSignal
 from PyQt6.QtWidgets import (
-    QFileDialog, QHBoxLayout, QLineEdit, QPushButton, QWidget,
+    QFileDialog, QHBoxLayout, QLineEdit, QMenu, QPushButton, QWidget,
 )
 
 from docforge import settings
@@ -32,10 +32,11 @@ class InputSelector(QWidget):
 
     changed = pyqtSignal()
 
-    def __init__(self, file_filter: str, exts: list[str]) -> None:
+    def __init__(self, file_filter: str, exts: list[str], recent_scope: str = "") -> None:
         super().__init__()
         self._filter = file_filter
         self._exts = exts
+        self._scope = recent_scope
         self._paths: list[str] = []
 
         row = QHBoxLayout(self)
@@ -59,9 +60,16 @@ class InputSelector(QWidget):
         btn_dir.setToolTip("Взять все поддерживаемые файлы из папки")
         btn_dir.clicked.connect(self.browse_folder)
 
+        self._recent_btn = QPushButton("▾")
+        self._recent_btn.setFixedWidth(26)
+        self._recent_btn.setToolTip("Недавние файлы")
+        self._recent_btn.clicked.connect(self._show_recent)
+
         row.addWidget(self._edit)
         row.addWidget(btn_files)
         row.addWidget(btn_dir)
+        row.addWidget(self._recent_btn)
+        self._recent_btn.setVisible(bool(self._scope))
 
     # ------------------------------------------------------------------ state
 
@@ -71,12 +79,30 @@ class InputSelector(QWidget):
     def count(self) -> int:
         return len(self._paths)
 
-    def set_paths(self, paths: list[str]) -> None:
+    def set_paths(self, paths: list[str], *, remember: bool = True) -> None:
         self._paths = [p for p in paths if p]
         self._edit.setText(summarize(self._paths) if self._paths else "")
         if self._paths:
             settings.remember_dir(self._paths[0])
+            if remember and self._scope:
+                settings.push_recent(self._scope, self._paths)
         self.changed.emit()
+
+    def _show_recent(self) -> None:
+        """Drop-down with the last selections; missing files are marked."""
+        menu = QMenu(self)
+        entries = settings.get_recent(self._scope)
+        if not entries:
+            menu.addAction("Пока пусто").setEnabled(False)
+        for entry in entries:
+            label = summarize(entry)
+            if len(label) > 70:
+                label = "..." + label[-67:]
+            if not all(os.path.exists(p) for p in entry):
+                label += "  (нет на диске)"
+            action = menu.addAction(label)
+            action.triggered.connect(lambda _checked, e=entry: self.set_paths(e))
+        menu.exec(self._recent_btn.mapToGlobal(self._recent_btn.rect().bottomLeft()))
 
     def _on_text_edited(self) -> None:
         """A hand-typed path replaces the selection; the summary text is kept."""
