@@ -256,6 +256,24 @@ def t_pandoc_options():
     assert "toc" in html.lower() or "Раздел один" in html, "оглавление не сформировано"
 check("Pandoc: опции --toc/--number-sections/--highlight-style", t_pandoc_options)
 
+# 10d. Защита результата: свободное имя и сравнение путей
+def t_paths():
+    from docforge.core.paths import same_file, unique_path
+    d = os.path.join(tmp, "конфликт")
+    os.makedirs(d, exist_ok=True)
+    f = os.path.join(d, "файл.md")
+    open(f, "w", encoding="utf-8").close()
+    u2 = unique_path(f)
+    assert u2.name == "файл-2.md", f"ожидалось файл-2.md, получено {u2.name}"
+    open(u2, "w", encoding="utf-8").close()
+    assert unique_path(f).name == "файл-3.md", "нумерация не продолжилась"
+    free = os.path.join(d, "нет-такого.md")
+    assert str(unique_path(free)) == free, "свободный путь не должен меняться"
+    # сравнение путей: разное написание одного файла
+    assert same_file(f, f.replace("\\", "/")), "один файл не распознан"
+    assert not same_file(f, str(u2)), "разные файлы посчитаны одинаковыми"
+check("Пути: свободное имя (-2/-3) и сравнение путей", t_paths)
+
 # 11. ffmpeg-статус (информационно)
 def t_ffmpeg():
     from docforge.core import ffmpeg as ffmpeg_helper

@@ -14,6 +14,7 @@ from docforge import settings
 from docforge.core import images
 from docforge.core.errors import friendly_error
 from docforge.ui import file_filters
+from docforge.ui.dialogs import resolve_output_conflict
 from docforge.ui.widgets import StatusLog
 
 log = logging.getLogger(__name__)
@@ -149,6 +150,13 @@ class ImagesTab(QWidget):
         if not os.path.isfile(input_path):
             self._log.append(f"Файл не найден: {input_path}")
             return
+
+        resolved = resolve_output_conflict(self, dest_dir, input_path, is_dir=True)
+        if resolved is None:
+            self._log.append("ℹ Извлечение отменено.")
+            return
+        dest_dir = resolved
+        self._dest_edit.setText(dest_dir)
 
         self._extract_btn.setEnabled(False)
         self._last_dest = dest_dir

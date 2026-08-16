@@ -14,6 +14,7 @@ from docforge import settings
 from docforge.core.errors import friendly_error
 from docforge.core.markitdown import convert_to_markdown
 from docforge.ui import file_filters
+from docforge.ui.dialogs import resolve_output_conflict
 from docforge.ui.widgets import StatusLog
 
 log = logging.getLogger(__name__)
@@ -151,6 +152,13 @@ class MarkItDownTab(QWidget):
         if not os.path.isfile(input_path):
             self._log.append(f"Файл не найден: {input_path}")
             return
+
+        resolved = resolve_output_conflict(self, output_path, input_path)
+        if resolved is None:
+            self._log.append("ℹ Конвертация отменена.")
+            return
+        output_path = resolved
+        self._output_edit.setText(output_path)
 
         self._convert_btn.setEnabled(False)
         self._last_output = output_path
