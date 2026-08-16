@@ -13,12 +13,12 @@ Convert documents between formats without touching the terminal.
 
 Every tab works with one file or many:
 
-- **Обзор** selects several files at once; **Папка** takes every supported file in a folder
+- **Browse** selects several files at once; **Folder** takes every supported file in a folder
 - Files (or a whole folder) can be dropped onto the window
 - The **▾** button next to the input field reopens one of the last 10 selections
 - With one file selected you name the result exactly; with several you pick an output
   folder and names are derived from the sources
-- Progress is shown as "3 из 12"; the convert button turns into **Отмена** while a batch
+- Progress is shown as "3 of 12"; the convert button turns into **Cancel** while a batch
   runs (jobs already started finish, the rest are skipped)
 - Jobs run in a small worker pool. PDF output is forced to one at a time — LaTeX and
   Chromium are heavy, and two MiKTeX processes installing packages can clash
@@ -27,7 +27,7 @@ Every tab works with one file or many:
 
 ### Windows integration (optional)
 
-The **Интеграция** button (top-right corner) offers two shortcuts, both written under
+The **Integration** button (top-right corner) offers two shortcuts, both written under
 `HKCU` — no administrator rights, and unchecking removes them again:
 
 - **Explorer context menu** — right-click a supported file to open it in DocForge
@@ -58,7 +58,7 @@ syntax-highlighting style for code.
 
 **Presets** keep a named set of these settings. Three come with the app (print-ready PDF,
 Word document with a table of contents, Markdown for an LLM); your own are saved with
-**Сохранить** and removed with **Удалить** — the built-in ones are protected.
+**Save** and removed with **Delete** — the built-in ones are protected.
 
 For PDF output you can pick the engine and the page margins (default `2cm`, editable):
 
@@ -95,7 +95,7 @@ are extracted with PyMuPDF; other formats via MarkItDown.
 - UTF-8 throughout — Cyrillic and other non-Latin text works out of the box
 - Conversion runs in a background thread — UI stays responsive
 - Browse dialogs show only supported file types by default
-- **Components** and **Интеграция** buttons (top-right corner) — manage dependencies and
+- **Components** and **Integration** buttons (top-right corner) — manage dependencies and
   Windows shortcuts at any time, not just on first launch
 - On first launch a setup window installs MarkItDown and Pandoc automatically and
   lets you opt into the optional components
@@ -189,7 +189,7 @@ in the Pandoc tab's **PDF — engine** dropdown. Installed from the **Components
 2. Choose the destination folder
 3. Click **Extract images**
 
-The status line at the bottom of a tab shows the latest result; **Подробнее** opens the full log of the run in a separate window, and **Папка** opens the result in Explorer.
+The status line at the bottom of a tab shows the latest result; **Details** opens the full log of the run in a separate window, and **Folder** opens the result in Explorer.
 
 ---
 
