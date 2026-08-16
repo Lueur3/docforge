@@ -9,6 +9,9 @@ import tempfile
 
 sys.stdout.reconfigure(encoding="utf-8")
 
+# Qt parts of the test run without a display
+os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
+
 # the package sits at the repo root, this test lives in tests/
 _ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, _ROOT)
@@ -29,6 +32,22 @@ tmp = tempfile.mkdtemp(prefix="docforge_smoke_")
 src_md = os.path.join(tmp, "тест входной.md")  # Cyrillic and a space in the file name
 with open(src_md, "w", encoding="utf-8") as f:
     f.write(CYRILLIC_MD)
+
+
+_QT_APP = None
+
+
+def qt_app():
+    """One QApplication for every Qt-dependent check (widgets need a full one).
+
+    The reference is kept module-level on purpose: if Python garbage-collects
+    the wrapper while widgets are alive, the interpreter crashes on shutdown.
+    """
+    global _QT_APP
+    if _QT_APP is None:
+        from PyQt6.QtWidgets import QApplication
+        _QT_APP = QApplication.instance() or QApplication([])
+    return _QT_APP
 
 
 def check(name: str, fn) -> None:
@@ -298,10 +317,9 @@ check("core.pandoc.convert: docx → md, относительные пути к�
 
 # 10g. Batch queue: progress, per-job results and failure handling
 def t_batch():
-    from PyQt6.QtCore import QCoreApplication
     from docforge.core.batch import BatchRunner, Job, pool_size
 
-    app = QCoreApplication.instance() or QCoreApplication([])  # noqa: F841
+    qt_app()
     jobs = [Job(f"in{i}.txt", os.path.join(tmp, f"batch{i}.txt")) for i in range(4)]
 
     def fn(job):
@@ -355,6 +373,47 @@ def t_unique_taken():
     assert first.name == "f-2.md", first.name
     assert second.name == "f-3.md", second.name
 check("Пакет: резервирование свободных имён", t_unique_taken)
+
+# 10j. Windows integration: registry verb round-trip on a throwaway extension
+def t_winintegration():
+    from docforge.core import winintegration as wi
+    exe, script = wi.launcher()
+    assert os.path.isfile(exe), f"лаунчер не найден: {exe}"
+    assert script.is_file(), f"main.py не найден: {script}"
+    assert wi.icon_path().is_file(), "иконка не найдена"
+    assert str(wi.sendto_shortcut()).endswith("DocForge.lnk"), "неверный путь ярлыка"
+
+    ext = ".docforge-selftest"  # fake, so the real file types stay untouched
+    assert not wi.context_menu_installed(ext), "тестовый ключ остался от прошлого прогона"
+    wi.install_context_menu([ext])
+    try:
+        assert wi.context_menu_installed(ext), "ключ не создан"
+        import winreg
+        key = rf"Software\Classes\SystemFileAssociations\{ext}\shell\DocForge\command"
+        with winreg.OpenKey(winreg.HKEY_CURRENT_USER, key) as k:
+            cmd = winreg.QueryValueEx(k, None)[0]
+        assert "main.py" in cmd and cmd.endswith('"%1"'), f"неверная команда: {cmd}"
+    finally:
+        wi.uninstall_context_menu([ext])
+    assert not wi.context_menu_installed(ext), "ключ не удалён"
+check("Интеграция с Windows: запись и удаление пункта меню", t_winintegration)
+
+# 10k. Explorer hand-off routes files to the fitting tab
+def t_file_handoff():
+    qt_app()
+    from docforge.ui.window import MainWindow
+
+    w = MainWindow()
+    cases = [("файл.docx", "Pandoc"), ("скан.pdf", "MarkItDown")]
+    for name, expected in cases:
+        p = os.path.join(tmp, name)
+        open(p, "w", encoding="utf-8").close()
+        w.load_files([p])
+        got = w._tabs.tabText(w._tabs.currentIndex())
+        assert got == expected, f"{name}: открылась вкладка {got}, ожидалась {expected}"
+        assert w._tabs.currentWidget()._inputs.count() == 1, "файл не подставился"
+    w.close()  # tear the window down while Qt is still alive
+check("Передача файлов из Проводника на нужную вкладку", t_file_handoff)
 
 # 11. ffmpeg status (informational)
 def t_ffmpeg():

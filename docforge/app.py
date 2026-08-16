@@ -1,4 +1,5 @@
 import logging
+import os
 import sys
 from pathlib import Path
 
@@ -37,7 +38,14 @@ def main() -> None:
     if ffmpeg_path:
         configure_pydub(ffmpeg_path)
 
+    # files passed on the command line (Explorer context menu / SendTo)
+    incoming = [a for a in sys.argv[1:] if os.path.isfile(a)]
+    if incoming:
+        log.info("Получено файлов из командной строки: %d", len(incoming))
+
     window = MainWindow(log_file)
+    if incoming:
+        window.load_files(incoming)
     window.show()
     log.info("Окно показано, лог пишется в %s", log_file)
     sys.exit(app.exec())

@@ -88,6 +88,10 @@ class ImagesTab(QWidget):
             self._dest_label.setText("Папка для изображений:")
             self._dest_edit.setText(str(Path(paths[0]).with_suffix("")) + "_images")
 
+    def load_files(self, paths: list[str]) -> None:
+        """Preselect files (used for Explorer hand-off)."""
+        self._inputs.set_paths(paths)
+
     def dragEnterEvent(self, event) -> None:
         if event.mimeData().hasUrls():
             event.acceptProposedAction()

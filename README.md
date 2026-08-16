@@ -24,6 +24,18 @@ Every tab works with one file or many:
 - If some results already exist you are asked once for the whole batch: save alongside
   (`name-2`), overwrite, or cancel
 
+### Windows integration (optional)
+
+The **Интеграция** button (top-right corner) offers two shortcuts, both written under
+`HKCU` — no administrator rights, and unchecking removes them again:
+
+- **Explorer context menu** — right-click a supported file to open it in DocForge
+- **SendTo shortcut** — right-click → Send to → DocForge. Better for several files at
+  once: they arrive in a single window as one batch
+
+Files handed over this way land on the tab that fits them (Pandoc when it can read the
+format, otherwise MarkItDown).
+
 ### MarkItDown tab
 
 Converts any supported file to Markdown using Microsoft's MarkItDown library.
@@ -77,8 +89,8 @@ are extracted with PyMuPDF; other formats via MarkItDown.
 - UTF-8 throughout — Cyrillic and other non-Latin text works out of the box
 - Conversion runs in a background thread — UI stays responsive
 - Browse dialogs show only supported file types by default
-- **Components** button (top-right corner) — install or check ffmpeg, MiKTeX and the
-  core at any time, not just on first launch
+- **Components** and **Интеграция** buttons (top-right corner) — manage dependencies and
+  Windows shortcuts at any time, not just on first launch
 - On first launch a setup window installs MarkItDown and Pandoc automatically and
   lets you opt into the optional components
 
@@ -171,7 +183,7 @@ in the Pandoc tab's **PDF — engine** dropdown. Installed from the **Components
 2. Choose the destination folder
 3. Click **Extract images**
 
-Conversion results and errors appear in the log area at the bottom of each tab.
+The status line at the bottom of a tab shows the latest result; **Подробнее** opens the full log of the run in a separate window, and **Папка** opens the result in Explorer.
 
 ---
 
@@ -203,6 +215,7 @@ docforge/
     batch.py               job queue, worker pool, progress
     paths.py               free output names, path comparison
     errors.py              readable wording for file errors
+    winintegration.py      Explorer verb + SendTo shortcut (HKCU)
     images.py              image extraction (MarkItDown + PyMuPDF)
     chromium.py            HTML → PDF via Playwright/Chromium
     latex.py               LaTeX engine discovery (MiKTeX)
@@ -214,6 +227,7 @@ docforge/
     widgets.py             status line + log window
     inputs.py              file/folder selector shared by the tabs
     dialogs.py             overwrite-protection prompts
+    integration_dialog.py  Windows integration dialog
     file_filters.py        supported extensions + Browse filters
     tabs/                  MarkItDown / Pandoc / Images tabs
   resources/app.ico        application icon

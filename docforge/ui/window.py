@@ -2,12 +2,16 @@ import logging
 import os
 from pathlib import Path
 
-from PyQt6.QtWidgets import QMainWindow, QTabWidget, QLabel, QPushButton
+from PyQt6.QtWidgets import (
+    QHBoxLayout, QLabel, QMainWindow, QPushButton, QTabWidget, QWidget,
+)
 
+from docforge.ui import file_filters
+from docforge.ui.integration_dialog import open_integration_dialog
 from docforge.ui.setup_dialog import open_components_dialog
+from docforge.ui.tabs.images import ImagesTab
 from docforge.ui.tabs.markitdown import MarkItDownTab
 from docforge.ui.tabs.pandoc import PandocTab
-from docforge.ui.tabs.images import ImagesTab
 
 log = logging.getLogger(__name__)
 
@@ -21,18 +25,13 @@ class MainWindow(QMainWindow):
         # here, and each tab's trailing stretch pins its fields to the top
         self.setFixedSize(640, 430)
 
-        tabs = QTabWidget()
-        tabs.addTab(MarkItDownTab(), "MarkItDown")
-        tabs.addTab(PandocTab(), "Pandoc")
-        tabs.addTab(ImagesTab(), "Изображения")
+        self._tabs = QTabWidget()
+        self._tabs.addTab(MarkItDownTab(), "MarkItDown")
+        self._tabs.addTab(PandocTab(), "Pandoc")
+        self._tabs.addTab(ImagesTab(), "Изображения")
+        self._tabs.setCornerWidget(self._build_corner())
 
-        # components button — always visible in the tab-bar corner
-        components_btn = QPushButton("Компоненты")
-        components_btn.setToolTip("Установить или проверить ffmpeg, MiKTeX, Chromium и ядро")
-        components_btn.clicked.connect(self._open_components)
-        tabs.setCornerWidget(components_btn)
-
-        self.setCentralWidget(tabs)
+        self.setCentralWidget(self._tabs)
 
         if log_file is not None:
             self._log_file = Path(log_file)
@@ -43,8 +42,41 @@ class MainWindow(QMainWindow):
             self.statusBar().addWidget(link)
         log.debug("MainWindow создан")
 
-    def _open_components(self) -> None:
-        open_components_dialog()
+    def _build_corner(self) -> QWidget:
+        """Corner buttons of the tab bar — always visible."""
+        corner = QWidget()
+        row = QHBoxLayout(corner)
+        row.setContentsMargins(0, 0, 4, 0)
+        row.setSpacing(4)
+
+        components_btn = QPushButton("Компоненты")
+        components_btn.setToolTip("Установить или проверить ffmpeg, MiKTeX, Chromium и ядро")
+        components_btn.clicked.connect(lambda: open_components_dialog())
+
+        integration_btn = QPushButton("Интеграция")
+        integration_btn.setToolTip("Пункт в контекстном меню Проводника и ярлык «Отправить»")
+        integration_btn.clicked.connect(lambda: open_integration_dialog(self))
+
+        row.addWidget(components_btn)
+        row.addWidget(integration_btn)
+        return corner
+
+    def load_files(self, paths: list[str]) -> None:
+        """Preselect files handed over by Explorer, on the most fitting tab."""
+        if not paths:
+            return
+        ext = Path(paths[0]).suffix.lower().lstrip(".")
+        # Pandoc converts between formats, so it wins when it can read the file
+        order = [
+            (1, file_filters.PANDOC_EXTS),
+            (0, file_filters.MARKITDOWN_EXTS),
+            (2, file_filters.IMAGES_EXTS),
+        ]
+        index = next((i for i, exts in order if ext in exts), 0)
+        tab = self._tabs.widget(index)
+        self._tabs.setCurrentIndex(index)
+        tab.load_files(paths)
+        log.info("Файлы переданы на вкладку «%s»: %d", self._tabs.tabText(index), len(paths))
 
     def _open_log_dir(self) -> None:
         folder = str(self._log_file.parent)

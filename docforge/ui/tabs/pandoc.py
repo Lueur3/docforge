@@ -212,6 +212,10 @@ class PandocTab(QWidget):
         settings.put("pandoc/format", self._current_ext())
         self._update_pdf_controls()
 
+    def load_files(self, paths: list[str]) -> None:
+        """Preselect files (used for Explorer hand-off)."""
+        self._inputs.set_paths(paths)
+
     def dragEnterEvent(self, event) -> None:
         if event.mimeData().hasUrls():
             event.acceptProposedAction()

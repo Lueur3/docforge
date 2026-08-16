@@ -96,6 +96,10 @@ class MarkItDownTab(QWidget):
             self._output_btn.setToolTip("Куда сохранить результат")
             self._output_edit.setText(str(Path(paths[0]).with_suffix(".md")))
 
+    def load_files(self, paths: list[str]) -> None:
+        """Preselect files (used for Explorer hand-off)."""
+        self._inputs.set_paths(paths)
+
     def dragEnterEvent(self, event) -> None:
         if event.mimeData().hasUrls():
             event.acceptProposedAction()
