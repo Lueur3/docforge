@@ -9,6 +9,21 @@ Convert documents between formats without touching the terminal.
 
 ## Features
 
+### Batch conversion
+
+Every tab works with one file or many:
+
+- **Обзор** selects several files at once; **Папка** takes every supported file in a folder
+- Files (or a whole folder) can be dropped onto the window
+- With one file selected you name the result exactly; with several you pick an output
+  folder and names are derived from the sources
+- Progress is shown as "3 из 12"; the convert button turns into **Отмена** while a batch
+  runs (jobs already started finish, the rest are skipped)
+- Jobs run in a small worker pool. PDF output is forced to one at a time — LaTeX and
+  Chromium are heavy, and two MiKTeX processes installing packages can clash
+- If some results already exist you are asked once for the whole batch: save alongside
+  (`name-2`), overwrite, or cancel
+
 ### MarkItDown tab
 
 Converts any supported file to Markdown using Microsoft's MarkItDown library.
@@ -184,7 +199,10 @@ docforge/
   proc.py                  shared subprocess flag (no console window)
   core/                    logic, no UI
     markitdown.py          file → Markdown
-    pandoc.py              Pandoc formats/options (data)
+    pandoc.py              Pandoc formats/options + the conversion routine
+    batch.py               job queue, worker pool, progress
+    paths.py               free output names, path comparison
+    errors.py              readable wording for file errors
     images.py              image extraction (MarkItDown + PyMuPDF)
     chromium.py            HTML → PDF via Playwright/Chromium
     latex.py               LaTeX engine discovery (MiKTeX)
@@ -194,7 +212,9 @@ docforge/
     window.py              main window
     setup_dialog.py        Components dialog
     widgets.py             status line + log window
-    file_filters.py        Browse-dialog filters
+    inputs.py              file/folder selector shared by the tabs
+    dialogs.py             overwrite-protection prompts
+    file_filters.py        supported extensions + Browse filters
     tabs/                  MarkItDown / Pandoc / Images tabs
   resources/app.ico        application icon
 ```

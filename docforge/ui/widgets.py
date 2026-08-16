@@ -75,6 +75,11 @@ class StatusLog(QWidget):
         if self._view is not None:
             self._view.append(text)
 
+    def set_progress(self, done: int, total: int, name: str) -> None:
+        """Show batch progress in the status line without growing the log."""
+        self._status.setStyleSheet("color: #aaa; font-size: 11px;")
+        self._status.setText(f"▶ {done} из {total}: {name}")
+
     def reset(self) -> None:
         """Reset before a new run: hide the "Папка" button."""
         self._result = None

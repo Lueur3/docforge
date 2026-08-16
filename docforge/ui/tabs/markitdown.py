@@ -3,89 +3,57 @@ import os
 from pathlib import Path
 from typing import Optional
 
-from PyQt6.QtWidgets import (
-    QWidget, QVBoxLayout, QHBoxLayout, QLabel,
-    QLineEdit, QPushButton, QFileDialog, QCheckBox,
-)
-from PyQt6.QtCore import QThread, pyqtSignal
 from PyQt6.QtGui import QKeySequence, QShortcut
+from PyQt6.QtWidgets import (
+    QCheckBox, QFileDialog, QHBoxLayout, QLabel, QLineEdit, QPushButton,
+    QVBoxLayout, QWidget,
+)
 
 from docforge import settings
-from docforge.core.errors import friendly_error
+from docforge.core.batch import BatchRunner, Job, pool_size
 from docforge.core.markitdown import convert_to_markdown
 from docforge.ui import file_filters
-from docforge.ui.dialogs import resolve_output_conflict
+from docforge.ui.dialogs import resolve_batch_conflicts
+from docforge.ui.inputs import InputSelector
 from docforge.ui.widgets import StatusLog
 
 log = logging.getLogger(__name__)
 
 
-class _ConvertWorker(QThread):
-    log  = pyqtSignal(str)
-    done = pyqtSignal(bool)
-
-    def __init__(self, input_path: str, output_path: str, extract_images: bool) -> None:
-        super().__init__()
-        self._input   = input_path
-        self._output  = output_path
-        self._extract = extract_images
-
-    def run(self) -> None:
-        try:
-            count = convert_to_markdown(self._input, self._output, self._extract)
-            if count:
-                media = str(Path(self._output).with_suffix("")) + "_media"
-                self.log.emit(f"ℹ Извлечено изображений: {count} → {media}")
-            self.log.emit(f"✓ Готово → {self._output}")
-            self.done.emit(True)
-        except Exception as e:
-            log.exception(
-                "MarkItDown: ошибка конвертации %s → %s", self._input, self._output
-            )
-            self.log.emit(f"✗ Ошибка MarkItDown: {friendly_error(e)}")
-            self.done.emit(False)
-
-
 class MarkItDownTab(QWidget):
     def __init__(self) -> None:
         super().__init__()
-        self._worker: Optional[_ConvertWorker] = None
-        self._last_output: str = ""
+        self._runner: Optional[BatchRunner] = None
+        self._last_result: str = ""
         self._build_ui()
         self.setAcceptDrops(True)
-        QShortcut(QKeySequence("Ctrl+O"), self, self._browse_input)
-        QShortcut(QKeySequence("Ctrl+Return"), self, self._run_convert)
-        QShortcut(QKeySequence("Ctrl+Enter"), self, self._run_convert)
+        QShortcut(QKeySequence("Ctrl+O"), self, self._inputs.browse_files)
+        QShortcut(QKeySequence("Ctrl+Return"), self, self._start)
+        QShortcut(QKeySequence("Ctrl+Enter"), self, self._start)
 
     def _build_ui(self) -> None:
         layout = QVBoxLayout(self)
         layout.setSpacing(8)
         layout.setContentsMargins(16, 16, 16, 16)
 
-        # Input file
-        layout.addWidget(QLabel("Входной файл:"))
-        row_in = QHBoxLayout()
-        self._input_edit = QLineEdit()
-        self._input_edit.setPlaceholderText("Путь к файлу...")
-        btn_in = QPushButton("Обзор")
-        btn_in.setFixedWidth(80)
-        btn_in.setToolTip("Выбрать файл (Ctrl+O). Можно также перетащить файл в окно.")
-        btn_in.clicked.connect(self._browse_input)
-        row_in.addWidget(self._input_edit)
-        row_in.addWidget(btn_in)
-        layout.addLayout(row_in)
+        # Input files
+        layout.addWidget(QLabel("Входные файлы:"))
+        self._inputs = InputSelector(file_filters.MARKITDOWN_INPUT, file_filters.MARKITDOWN_EXTS)
+        self._inputs.changed.connect(self._on_inputs_changed)
+        layout.addWidget(self._inputs)
 
-        # Output file
-        layout.addWidget(QLabel("Выходной файл (.md):"))
+        # Output: a file for one input, a folder for several
+        self._output_label = QLabel("Выходной файл (.md):")
+        layout.addWidget(self._output_label)
         row_out = QHBoxLayout()
         self._output_edit = QLineEdit()
         self._output_edit.setPlaceholderText("Путь к файлу результата...")
-        btn_out = QPushButton("Обзор")
-        btn_out.setFixedWidth(80)
-        btn_out.setToolTip("Куда сохранить .md")
-        btn_out.clicked.connect(self._browse_output)
+        self._output_btn = QPushButton("Обзор")
+        self._output_btn.setFixedWidth(80)
+        self._output_btn.setToolTip("Куда сохранить результат")
+        self._output_btn.clicked.connect(self._browse_output)
         row_out.addWidget(self._output_edit)
-        row_out.addWidget(btn_out)
+        row_out.addWidget(self._output_btn)
         layout.addLayout(row_out)
 
         # Image extraction (the state is remembered between launches)
@@ -96,11 +64,11 @@ class MarkItDownTab(QWidget):
         )
         layout.addWidget(self._extract_chk)
 
-        # Convert button
+        # Convert button (turns into Cancel while a batch is running)
         self._convert_btn = QPushButton("Конвертировать")
         self._convert_btn.setObjectName("btn_convert")
         self._convert_btn.setFixedHeight(36)
-        self._convert_btn.clicked.connect(self._run_convert)
+        self._convert_btn.clicked.connect(self._on_button)
         layout.addWidget(self._convert_btn)
 
         # status line + details button
@@ -110,69 +78,120 @@ class MarkItDownTab(QWidget):
         # trailing stretch pins the content to the top — no large gaps
         layout.addStretch()
 
-    def _set_input(self, path: str) -> None:
-        self._input_edit.setText(path)
-        # the output path always follows the newly chosen input
-        self._output_edit.setText(str(Path(path).with_suffix(".md")))
-        settings.remember_dir(path)
+    # --------------------------------------------------------------- inputs
 
-    def _browse_input(self) -> None:
-        path, _ = QFileDialog.getOpenFileName(
-            self, "Выбрать файл", settings.last_dir(), file_filters.MARKITDOWN_INPUT
-        )
-        if path:
-            self._set_input(path)
+    def _batch(self) -> bool:
+        return self._inputs.count() > 1
+
+    def _on_inputs_changed(self) -> None:
+        paths = self._inputs.paths()
+        if not paths:
+            return
+        if self._batch():
+            self._output_label.setText("Папка результата:")
+            self._output_btn.setToolTip("Папка, куда сложить готовые .md")
+            self._output_edit.setText(str(Path(paths[0]).parent))
+        else:
+            self._output_label.setText("Выходной файл (.md):")
+            self._output_btn.setToolTip("Куда сохранить результат")
+            self._output_edit.setText(str(Path(paths[0]).with_suffix(".md")))
 
     def dragEnterEvent(self, event) -> None:
         if event.mimeData().hasUrls():
             event.acceptProposedAction()
 
     def dropEvent(self, event) -> None:
-        for url in event.mimeData().urls():
-            path = url.toLocalFile()
-            if path and os.path.isfile(path):
-                self._set_input(path)
-                break
+        self._inputs.accept_drop(event.mimeData().urls())
 
     def _browse_output(self) -> None:
+        if self._batch():
+            folder = QFileDialog.getExistingDirectory(
+                self, "Папка для результатов", self._output_edit.text() or settings.last_dir()
+            )
+            if folder:
+                self._output_edit.setText(folder)
+            return
         initial = self._output_edit.text() or str(Path.home())
-        path, _ = QFileDialog.getSaveFileName(
-            self, "Сохранить как", initial, "Markdown (*.md)"
-        )
+        path, _ = QFileDialog.getSaveFileName(self, "Сохранить как", initial, "Markdown (*.md)")
         if path:
             self._output_edit.setText(path)
 
-    def _run_convert(self) -> None:
-        input_path  = self._input_edit.text().strip()
-        output_path = self._output_edit.text().strip()
+    # ------------------------------------------------------------------ run
 
-        if not input_path or not output_path:
-            self._log.append("Укажите входной и выходной файлы.")
-            return
-        if not os.path.isfile(input_path):
-            self._log.append(f"Файл не найден: {input_path}")
-            return
+    def _build_jobs(self) -> list[Job] | None:
+        inputs = [p for p in self._inputs.paths() if os.path.isfile(p)]
+        missing = self._inputs.count() - len(inputs)
+        if missing:
+            self._log.append(f"ℹ Пропущено несуществующих файлов: {missing}")
+        if not inputs:
+            self._log.append("Укажите входной файл.")
+            return None
 
-        resolved = resolve_output_conflict(self, output_path, input_path)
-        if resolved is None:
+        target = self._output_edit.text().strip()
+        if not target:
+            self._log.append("Укажите, куда сохранить результат.")
+            return None
+
+        if len(inputs) == 1 and not self._batch():
+            return [Job(inputs[0], target)]
+        out_dir = Path(target)
+        return [Job(p, str(out_dir / (Path(p).stem + ".md"))) for p in inputs]
+
+    def _on_button(self) -> None:
+        if self._runner is not None and self._runner.isRunning():
+            self._runner.cancel()
+            self._convert_btn.setEnabled(False)
+            self._log.append("ℹ Отмена — ждём завершения текущих файлов...")
+            return
+        self._start()
+
+    def _start(self) -> None:
+        if self._runner is not None and self._runner.isRunning():
+            return
+        jobs = self._build_jobs()
+        if not jobs:
+            return
+        jobs = resolve_batch_conflicts(self, jobs)
+        if not jobs:
             self._log.append("ℹ Конвертация отменена.")
             return
-        output_path = resolved
-        self._output_edit.setText(output_path)
 
-        self._convert_btn.setEnabled(False)
-        self._last_output = output_path
+        out_dir = Path(jobs[0].output_path).parent
+        try:
+            out_dir.mkdir(parents=True, exist_ok=True)
+        except OSError as e:
+            self._log.append(f"✗ Не удалось создать папку результата: {e}")
+            return
+
+        self._last_result = jobs[0].output_path if len(jobs) == 1 else str(out_dir)
         self._log.reset()
-        self._log.append(f"▶ Конвертация: {input_path}")
-
-        self._worker = _ConvertWorker(
-            input_path, output_path, self._extract_chk.isChecked()
+        self._log.append(
+            f"▶ Конвертация: {jobs[0].name}" if len(jobs) == 1
+            else f"▶ Пакетная конвертация: {len(jobs)} файлов"
         )
-        self._worker.log.connect(self._log.append)
-        self._worker.done.connect(self._on_done)
-        self._worker.start()
+        self._convert_btn.setText("Отмена")
 
-    def _on_done(self, success: bool) -> None:
+        extract = self._extract_chk.isChecked()
+        self._runner = BatchRunner(
+            jobs,
+            lambda job: convert_to_markdown(job.input_path, job.output_path, extract),
+            max_workers=pool_size(len(jobs), heavy=False),
+        )
+        self._runner.progress.connect(self._log.set_progress)
+        self._runner.message.connect(self._log.append)
+        self._runner.completed.connect(self._on_completed)
+        self._runner.start()
+
+    def _on_completed(self, ok: int, failed: int) -> None:
+        self._convert_btn.setText("Конвертировать")
         self._convert_btn.setEnabled(True)
-        if success:
-            self._log.set_result(self._last_output)
+        if failed and ok:
+            self._log.append(f"✓ Готово: {ok}, с ошибкой: {failed}")
+        elif failed:
+            self._log.append(f"✗ Не удалось конвертировать файлов: {failed}")
+        elif ok == 1:
+            self._log.append(f"✓ Готово → {self._last_result}")
+        else:
+            self._log.append(f"✓ Готово: {ok} файлов → {self._last_result}")
+        if ok:
+            self._log.set_result(self._last_result)

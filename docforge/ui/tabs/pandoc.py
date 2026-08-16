@@ -1,229 +1,47 @@
-import contextlib
 import logging
 import os
-import urllib.parse
 from pathlib import Path
 from typing import Optional
 
-from PyQt6.QtWidgets import (
-    QWidget, QVBoxLayout, QHBoxLayout, QLabel,
-    QLineEdit, QPushButton, QFileDialog, QComboBox, QCheckBox,
-)
-from PyQt6.QtCore import QThread, pyqtSignal
 from PyQt6.QtGui import QKeySequence, QShortcut
+from PyQt6.QtWidgets import (
+    QCheckBox, QComboBox, QFileDialog, QHBoxLayout, QLabel, QLineEdit,
+    QPushButton, QVBoxLayout, QWidget,
+)
 
 from docforge import settings
-from docforge.core import chromium, latex
-from docforge.core.errors import friendly_error
-from docforge.core.pandoc import FORMATS, HIGHLIGHT_STYLES
+from docforge.core import pandoc
+from docforge.core.batch import BatchRunner, Job, pool_size
+from docforge.core.pandoc import FORMATS, HIGHLIGHT_STYLES, PandocOptions
 from docforge.ui import file_filters
-from docforge.ui.dialogs import resolve_output_conflict
+from docforge.ui.dialogs import resolve_batch_conflicts
+from docforge.ui.inputs import InputSelector
 from docforge.ui.widgets import StatusLog
 
 log = logging.getLogger(__name__)
 
 
-class _ConvertWorker(QThread):
-    log  = pyqtSignal(str)
-    done = pyqtSignal(bool)
-
-    def __init__(self, input_path: str, output_path: str, writer: str, standalone: bool,
-                 toc: bool = False, number_sections: bool = False,
-                 highlight: str = "", pdf_engine: str = "latex", margin: str = "") -> None:
-        super().__init__()
-        self._input           = input_path
-        self._output          = output_path
-        self._writer          = writer
-        self._standalone      = standalone
-        self._toc             = toc
-        self._number_sections = number_sections
-        self._highlight       = highlight
-        self._pdf_engine      = pdf_engine
-        self._margin          = margin
-
-    def run(self) -> None:
-        try:
-            import pypandoc
-
-            in_ext = Path(self._input).suffix.lower()
-            size = os.path.getsize(self._input) if os.path.isfile(self._input) else -1
-            log.info(
-                "Pandoc: вход=%s (формат=%s, размер=%d Б) → writer=%s, выход=%s, standalone=%s",
-                self._input, in_ext, size, self._writer, self._output, self._standalone,
-            )
-
-            # Chromium takes a separate route: pandoc makes HTML, Chromium prints the PDF
-            if self._writer == "pdf" and self._pdf_engine == "chromium":
-                self._convert_via_chromium()
-                return
-
-            extra = ["--standalone"] if self._standalone else []
-
-            if self._writer == "pdf":
-                engine = latex.find_pdf_engine()
-                if engine is None:
-                    log.warning("Pandoc: PDF-движок не найден")
-                    self.log.emit("✗ Для вывода в PDF нужен LaTeX-движок.")
-                    self.log.emit(
-                        "ℹ Установите MiKTeX (https://miktex.org) — "
-                        "приложение найдёт его автоматически."
-                    )
-                    self.done.emit(False)
-                    return
-                log.info("Pandoc: PDF-движок=%s", engine)
-                self.log.emit(f"▶ PDF-движок: {engine}")
-                latex.ensure_autoinstall(engine)
-                extra.append(f"--pdf-engine={engine}")
-                if latex.is_unicode_engine(engine):
-                    # a system font that covers Cyrillic
-                    extra += ["-V", "mainfont=Segoe UI"]
-                if self._margin:
-                    extra += ["-V", f"geometry:margin={self._margin}"]
-            elif self._writer == "html":
-                # images from docx/odt/epub get embedded straight into the html
-                extra.append("--embed-resources")
-            media_dir: Optional[str] = None
-            if self._writer in ("markdown", "rst", "latex"):
-                # images are extracted into a folder next to the output file
-                media_dir = str(Path(self._output).with_suffix("")) + "_media"
-                extra.append(f"--extract-media={media_dir}")
-
-            # user-selected options
-            if self._toc:
-                extra.append("--toc")
-                if "--standalone" not in extra:
-                    extra.append("--standalone")  # a TOC needs a full document
-            if self._number_sections:
-                extra.append("--number-sections")
-            if self._highlight == "--no-highlight":
-                extra.append("--no-highlight")
-            elif self._highlight:
-                extra.append(f"--highlight-style={self._highlight}")
-
-            writer = self._writer
-            if writer == "markdown":
-                # no pandoc {width=...} attributes and no raw-HTML <img> —
-                # otherwise the images don't render in common viewers
-                writer = "markdown-link_attributes-raw_html"
-
-            log.debug("Pandoc: pypandoc.convert_file writer=%s extra_args=%s", writer, extra)
-            pypandoc.convert_file(
-                self._input,
-                writer,
-                outputfile=self._output,
-                extra_args=extra,
-            )
-
-            if media_dir and os.path.isdir(media_dir):
-                self._relativize_media_paths(media_dir)
-                self.log.emit(f"ℹ Картинки извлечены в: {media_dir}")
-
-            log.info("Pandoc: готово → %s", self._output)
-            self.log.emit(f"✓ Готово → {self._output}")
-            self.done.emit(True)
-        except Exception as e:
-            error_msg = str(e)
-            log.exception(
-                "Pandoc: ошибка конвертации %s → %s (writer=%s)",
-                self._input, self._output, self._writer,
-            )
-            self.log.emit(f"✗ Ошибка Pandoc: {friendly_error(e)}")
-            if self._writer == "pdf" and "package" in error_msg.lower():
-                self.log.emit(
-                    "ℹ Похоже, MiKTeX не хватает LaTeX-пакетов. Откройте MiKTeX Console → "
-                    "Settings → установите 'Always install missing packages on-the-fly' "
-                    "и повторите попытку."
-                )
-            self.done.emit(False)
-
-    def _convert_via_chromium(self) -> None:
-        """PDF via Chromium: pandoc makes a self-contained HTML, Chromium prints it."""
-        import tempfile
-        import pypandoc
-
-        if not chromium.available():
-            log.warning("Pandoc: Chromium/Playwright не установлен")
-            self.log.emit("✗ Движок Chromium не установлен.")
-            self.log.emit("ℹ Установите его в диалоге «Компоненты».")
-            self.done.emit(False)
-            return
-
-        in_ext = Path(self._input).suffix.lower()
-        tmp_html = None
-        try:
-            if in_ext in (".html", ".htm"):
-                html_path = self._input
-            else:
-                fd, tmp_html = tempfile.mkstemp(suffix=".html")
-                os.close(fd)
-                pypandoc.convert_file(
-                    self._input, "html", outputfile=tmp_html,
-                    extra_args=["--standalone", "--embed-resources"],
-                )
-                html_path = tmp_html
-            self.log.emit("▶ PDF-движок: Chromium")
-            chromium.html_to_pdf(html_path, self._output, self._margin)
-            log.info("Pandoc/Chromium: готово → %s", self._output)
-            self.log.emit(f"✓ Готово → {self._output}")
-            self.done.emit(True)
-        except Exception as e:
-            log.exception("Chromium: ошибка конвертации %s → %s", self._input, self._output)
-            self.log.emit(f"✗ Ошибка Chromium: {friendly_error(e)}")
-            self.done.emit(False)
-        finally:
-            if tmp_html and os.path.exists(tmp_html):
-                with contextlib.suppress(OSError):
-                    os.remove(tmp_html)
-
-    def _relativize_media_paths(self, media_dir: str) -> None:
-        """Rewrite absolute image paths as relative ones.
-
-        Pandoc writes the --extract-media path verbatim, so the links break
-        when the file is moved and fail to render in most viewers.
-        """
-        out = Path(self._output)
-        try:
-            text = out.read_text(encoding="utf-8")
-        except (OSError, UnicodeDecodeError):
-            return
-        rel = os.path.basename(media_dir)
-        fwd = media_dir.replace("\\", "/")
-        variants = {media_dir, fwd, urllib.parse.quote(fwd, safe=":/")}
-        new_text = text
-        for v in variants:
-            new_text = new_text.replace(v, rel)
-        if new_text != text:
-            out.write_text(new_text, encoding="utf-8")
-
-
 class PandocTab(QWidget):
     def __init__(self) -> None:
         super().__init__()
-        self._worker: Optional[_ConvertWorker] = None
-        self._last_output: str = ""
+        self._runner: Optional[BatchRunner] = None
+        self._last_result: str = ""
         self._build_ui()
         self.setAcceptDrops(True)
-        QShortcut(QKeySequence("Ctrl+O"), self, self._browse_input)
-        QShortcut(QKeySequence("Ctrl+Return"), self, self._run_convert)
-        QShortcut(QKeySequence("Ctrl+Enter"), self, self._run_convert)
+        QShortcut(QKeySequence("Ctrl+O"), self, self._inputs.browse_files)
+        QShortcut(QKeySequence("Ctrl+Return"), self, self._start)
+        QShortcut(QKeySequence("Ctrl+Enter"), self, self._start)
 
     def _build_ui(self) -> None:
         layout = QVBoxLayout(self)
         layout.setSpacing(8)
         layout.setContentsMargins(16, 16, 16, 16)
 
-        # Input file
-        layout.addWidget(QLabel("Входной файл:"))
-        row_in = QHBoxLayout()
-        self._input_edit = QLineEdit()
-        self._input_edit.setPlaceholderText("Путь к файлу...")
-        btn_in = QPushButton("Обзор")
-        btn_in.setFixedWidth(80)
-        btn_in.setToolTip("Выбрать файл (Ctrl+O). Можно также перетащить файл в окно.")
-        btn_in.clicked.connect(self._browse_input)
-        row_in.addWidget(self._input_edit)
-        row_in.addWidget(btn_in)
-        layout.addLayout(row_in)
+        # Input files
+        layout.addWidget(QLabel("Входные файлы:"))
+        self._inputs = InputSelector(file_filters.PANDOC_INPUT, file_filters.PANDOC_EXTS)
+        self._inputs.changed.connect(self._on_inputs_changed)
+        layout.addWidget(self._inputs)
 
         # Output format
         layout.addWidget(QLabel("Формат вывода:"))
@@ -233,17 +51,18 @@ class PandocTab(QWidget):
         self._fmt_combo.currentIndexChanged.connect(self._on_format_changed)
         layout.addWidget(self._fmt_combo)
 
-        # Output file
-        layout.addWidget(QLabel("Выходной файл:"))
+        # Output: a file for one input, a folder for several
+        self._output_label = QLabel("Выходной файл:")
+        layout.addWidget(self._output_label)
         row_out = QHBoxLayout()
         self._output_edit = QLineEdit()
         self._output_edit.setPlaceholderText("Путь к файлу результата...")
-        btn_out = QPushButton("Обзор")
-        btn_out.setFixedWidth(80)
-        btn_out.setToolTip("Куда сохранить результат")
-        btn_out.clicked.connect(self._browse_output)
+        self._output_btn = QPushButton("Обзор")
+        self._output_btn.setFixedWidth(80)
+        self._output_btn.setToolTip("Куда сохранить результат")
+        self._output_btn.clicked.connect(self._browse_output)
         row_out.addWidget(self._output_edit)
-        row_out.addWidget(btn_out)
+        row_out.addWidget(self._output_btn)
         layout.addLayout(row_out)
 
         # Settings (collapsed by default)
@@ -257,11 +76,11 @@ class PandocTab(QWidget):
         self._settings_box.hide()
         layout.addWidget(self._settings_box)
 
-        # Convert button
+        # Convert button (turns into Cancel while a batch is running)
         self._convert_btn = QPushButton("Конвертировать")
         self._convert_btn.setObjectName("btn_convert")
         self._convert_btn.setFixedHeight(36)
-        self._convert_btn.clicked.connect(self._run_convert)
+        self._convert_btn.clicked.connect(self._on_button)
         layout.addWidget(self._convert_btn)
 
         # status line + details button
@@ -272,9 +91,9 @@ class PandocTab(QWidget):
         layout.addStretch()
 
         # restore the last format (after the combo has been filled)
-        _fi = self._fmt_combo.findData(settings.get_str("pandoc/format", "md"))
-        if _fi >= 0:
-            self._fmt_combo.setCurrentIndex(_fi)
+        idx = self._fmt_combo.findData(settings.get_str("pandoc/format", "md"))
+        if idx >= 0:
+            self._fmt_combo.setCurrentIndex(idx)
         self._update_pdf_controls()
 
     def _build_settings_box(self) -> QWidget:
@@ -315,9 +134,9 @@ class PandocTab(QWidget):
         # Chromium first — the default PDF engine
         self._engine_combo.addItem("Chromium (как браузер)", "chromium")
         self._engine_combo.addItem("xelatex (LaTeX)", "latex")
-        _ei = self._engine_combo.findData(settings.get_str("pandoc/engine", "chromium"))
-        if _ei >= 0:
-            self._engine_combo.setCurrentIndex(_ei)
+        idx = self._engine_combo.findData(settings.get_str("pandoc/engine", "chromium"))
+        if idx >= 0:
+            self._engine_combo.setCurrentIndex(idx)
         self._engine_combo.currentIndexChanged.connect(
             lambda: settings.put("pandoc/engine", self._engine_combo.currentData())
         )
@@ -325,7 +144,9 @@ class PandocTab(QWidget):
         pdf_row.addWidget(QLabel("поля:"))
         self._margin_edit = QLineEdit(settings.get_str("pandoc/margin", "2cm"))
         self._margin_edit.setFixedWidth(70)
-        self._margin_edit.setToolTip("Например: 2cm, 1.5cm, 1in, 20mm. Пусто — поля движка по умолчанию.")
+        self._margin_edit.setToolTip(
+            "Например: 2cm, 1.5cm, 1in, 20mm. Пусто — поля движка по умолчанию."
+        )
         self._margin_edit.editingFinished.connect(
             lambda: settings.put("pandoc/margin", self._margin_edit.text().strip())
         )
@@ -344,6 +165,8 @@ class PandocTab(QWidget):
         self._engine_combo.setEnabled(is_pdf)
         self._margin_edit.setEnabled(is_pdf)
 
+    # --------------------------------------------------------------- state
+
     def _current_ext(self) -> str:
         return self._fmt_combo.currentData()
 
@@ -353,31 +176,57 @@ class PandocTab(QWidget):
     def _current_standalone(self) -> bool:
         return FORMATS[self._fmt_combo.currentIndex()][3]
 
-    def _set_input(self, path: str) -> None:
-        self._input_edit.setText(path)
-        # the output path always follows the newly chosen input
-        self._output_edit.setText(str(Path(path).with_suffix(f".{self._current_ext()}")))
-        settings.remember_dir(path)
+    def _batch(self) -> bool:
+        return self._inputs.count() > 1
 
-    def _browse_input(self) -> None:
-        path, _ = QFileDialog.getOpenFileName(
-            self, "Выбрать файл", settings.last_dir(), file_filters.PANDOC_INPUT
+    def _options(self) -> PandocOptions:
+        return PandocOptions(
+            writer=self._current_writer(),
+            standalone=self._current_standalone(),
+            toc=self._toc_chk.isChecked(),
+            number_sections=self._numsec_chk.isChecked(),
+            highlight=HIGHLIGHT_STYLES[self._highlight_combo.currentIndex()][1],
+            pdf_engine=self._engine_combo.currentData(),
+            margin=self._margin_edit.text().strip(),
         )
-        if path:
-            self._set_input(path)
+
+    # --------------------------------------------------------------- inputs
+
+    def _on_inputs_changed(self) -> None:
+        paths = self._inputs.paths()
+        if not paths:
+            return
+        if self._batch():
+            self._output_label.setText("Папка результата:")
+            self._output_btn.setToolTip("Папка, куда сложить готовые файлы")
+            self._output_edit.setText(str(Path(paths[0]).parent))
+        else:
+            self._output_label.setText("Выходной файл:")
+            self._output_btn.setToolTip("Куда сохранить результат")
+            self._output_edit.setText(str(Path(paths[0]).with_suffix(f".{self._current_ext()}")))
+
+    def _on_format_changed(self) -> None:
+        current = self._output_edit.text()
+        if current and not self._batch():
+            self._output_edit.setText(str(Path(current).with_suffix(f".{self._current_ext()}")))
+        settings.put("pandoc/format", self._current_ext())
+        self._update_pdf_controls()
 
     def dragEnterEvent(self, event) -> None:
         if event.mimeData().hasUrls():
             event.acceptProposedAction()
 
     def dropEvent(self, event) -> None:
-        for url in event.mimeData().urls():
-            path = url.toLocalFile()
-            if path and os.path.isfile(path):
-                self._set_input(path)
-                break
+        self._inputs.accept_drop(event.mimeData().urls())
 
     def _browse_output(self) -> None:
+        if self._batch():
+            folder = QFileDialog.getExistingDirectory(
+                self, "Папка для результатов", self._output_edit.text() or settings.last_dir()
+            )
+            if folder:
+                self._output_edit.setText(folder)
+            return
         ext = self._current_ext()
         initial = self._output_edit.text() or str(Path.home())
         path, _ = QFileDialog.getSaveFileName(
@@ -386,52 +235,85 @@ class PandocTab(QWidget):
         if path:
             self._output_edit.setText(path)
 
-    def _on_format_changed(self) -> None:
-        current = self._output_edit.text()
-        if current:
-            self._output_edit.setText(
-                str(Path(current).with_suffix(f".{self._current_ext()}"))
-            )
-        settings.put("pandoc/format", self._current_ext())
-        self._update_pdf_controls()
+    # ------------------------------------------------------------------ run
 
-    def _run_convert(self) -> None:
-        input_path  = self._input_edit.text().strip()
-        output_path = self._output_edit.text().strip()
+    def _build_jobs(self) -> list[Job] | None:
+        inputs = [p for p in self._inputs.paths() if os.path.isfile(p)]
+        missing = self._inputs.count() - len(inputs)
+        if missing:
+            self._log.append(f"ℹ Пропущено несуществующих файлов: {missing}")
+        if not inputs:
+            self._log.append("Укажите входной файл.")
+            return None
 
-        if not input_path or not output_path:
-            self._log.append("Укажите входной и выходной файлы.")
+        target = self._output_edit.text().strip()
+        if not target:
+            self._log.append("Укажите, куда сохранить результат.")
+            return None
+
+        if len(inputs) == 1 and not self._batch():
+            return [Job(inputs[0], target)]
+        out_dir = Path(target)
+        ext = self._current_ext()
+        return [Job(p, str(out_dir / f"{Path(p).stem}.{ext}")) for p in inputs]
+
+    def _on_button(self) -> None:
+        if self._runner is not None and self._runner.isRunning():
+            self._runner.cancel()
+            self._convert_btn.setEnabled(False)
+            self._log.append("ℹ Отмена — ждём завершения текущих файлов...")
             return
-        if not os.path.isfile(input_path):
-            self._log.append(f"Файл не найден: {input_path}")
-            return
+        self._start()
 
-        resolved = resolve_output_conflict(self, output_path, input_path)
-        if resolved is None:
+    def _start(self) -> None:
+        if self._runner is not None and self._runner.isRunning():
+            return
+        jobs = self._build_jobs()
+        if not jobs:
+            return
+        jobs = resolve_batch_conflicts(self, jobs)
+        if not jobs:
             self._log.append("ℹ Конвертация отменена.")
             return
-        output_path = resolved
-        self._output_edit.setText(output_path)
 
-        self._convert_btn.setEnabled(False)
-        self._last_output = output_path
+        out_dir = Path(jobs[0].output_path).parent
+        try:
+            out_dir.mkdir(parents=True, exist_ok=True)
+        except OSError as e:
+            self._log.append(f"✗ Не удалось создать папку результата: {e}")
+            return
+
+        opts = self._options()
+        self._last_result = jobs[0].output_path if len(jobs) == 1 else str(out_dir)
         self._log.reset()
-        self._log.append(f"▶ Конвертация в .{self._current_ext()}: {input_path}")
-
-        highlight = HIGHLIGHT_STYLES[self._highlight_combo.currentIndex()][1]
-        self._worker = _ConvertWorker(
-            input_path, output_path, self._current_writer(), self._current_standalone(),
-            toc=self._toc_chk.isChecked(),
-            number_sections=self._numsec_chk.isChecked(),
-            highlight=highlight,
-            pdf_engine=self._engine_combo.currentData(),
-            margin=self._margin_edit.text().strip(),
+        self._log.append(
+            f"▶ Конвертация в .{self._current_ext()}: {jobs[0].name}" if len(jobs) == 1
+            else f"▶ Пакетная конвертация в .{self._current_ext()}: {len(jobs)} файлов"
         )
-        self._worker.log.connect(self._log.append)
-        self._worker.done.connect(self._on_done)
-        self._worker.start()
+        self._convert_btn.setText("Отмена")
 
-    def _on_done(self, success: bool) -> None:
+        # one message channel for all jobs — engine notes go to the details log
+        say = self._log.append if len(jobs) == 1 else (lambda _m: None)
+        self._runner = BatchRunner(
+            jobs,
+            lambda job: pandoc.convert(job.input_path, job.output_path, opts, say),
+            max_workers=pool_size(len(jobs), heavy=opts.is_heavy),
+        )
+        self._runner.progress.connect(self._log.set_progress)
+        self._runner.message.connect(self._log.append)
+        self._runner.completed.connect(self._on_completed)
+        self._runner.start()
+
+    def _on_completed(self, ok: int, failed: int) -> None:
+        self._convert_btn.setText("Конвертировать")
         self._convert_btn.setEnabled(True)
-        if success:
-            self._log.set_result(self._last_output)
+        if failed and ok:
+            self._log.append(f"✓ Готово: {ok}, с ошибкой: {failed}")
+        elif failed:
+            self._log.append(f"✗ Не удалось конвертировать файлов: {failed}")
+        elif ok == 1:
+            self._log.append(f"✓ Готово → {self._last_result}")
+        else:
+            self._log.append(f"✓ Готово: {ok} файлов → {self._last_result}")
+        if ok:
+            self._log.set_result(self._last_result)

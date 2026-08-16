@@ -274,6 +274,88 @@ def t_paths():
     assert not same_file(f, str(u2)), "разные файлы посчитаны одинаковыми"
 check("Пути: свободное имя (-2/-3) и сравнение путей", t_paths)
 
+# 10e. core.pandoc.convert: the real conversion path used by the tab
+def t_core_convert():
+    from docforge.core.pandoc import PandocOptions, convert
+    out = os.path.join(tmp, "core_convert.html")
+    convert(src_md, out, PandocOptions(writer="html", standalone=True, toc=True))
+    assert os.path.getsize(out) > 0, "пустой результат"
+    with open(out, encoding="utf-8") as f:
+        assert MARKER in f.read(), "кириллица потеряна"
+check("core.pandoc.convert: md → html с оглавлением", t_core_convert)
+
+# 10f. core.pandoc.convert: docx → md, images end up relative
+def t_core_convert_media():
+    from docforge.core.pandoc import PandocOptions, convert
+    docx = os.path.join(tmp, "img.docx")  # created by an earlier check
+    out = os.path.join(tmp, "core_media.md")
+    convert(docx, out, PandocOptions(writer="markdown"))
+    text = open(out, encoding="utf-8").read()
+    assert "![" in text, "ссылка на картинку отсутствует"
+    assert tmp not in text, "остался абсолютный путь"
+    assert os.path.isdir(os.path.splitext(out)[0] + "_media"), "папка с медиа не создана"
+check("core.pandoc.convert: docx → md, относительные пути картинок", t_core_convert_media)
+
+# 10g. Batch queue: progress, per-job results and failure handling
+def t_batch():
+    from PyQt6.QtCore import QCoreApplication
+    from docforge.core.batch import BatchRunner, Job, pool_size
+
+    app = QCoreApplication.instance() or QCoreApplication([])  # noqa: F841
+    jobs = [Job(f"in{i}.txt", os.path.join(tmp, f"batch{i}.txt")) for i in range(4)]
+
+    def fn(job):
+        if job.input_path.endswith("2.txt"):
+            raise PermissionError("нет доступа")
+        with open(job.output_path, "w", encoding="utf-8") as f:
+            f.write("ok")
+
+    seen_progress, messages, done = [], [], []
+    runner = BatchRunner(jobs, fn, max_workers=2)
+    runner.progress.connect(lambda d, t, n: seen_progress.append((d, t)))
+    runner.message.connect(messages.append)
+    runner.completed.connect(lambda ok, failed: done.append((ok, failed)))
+    runner.run()  # synchronous: signals connect directly in this thread
+
+    assert done == [(3, 1)], f"ожидалось (3,1), получено {done}"
+    assert len(seen_progress) == 4, f"прогресс пришёл {len(seen_progress)} раз"
+    assert seen_progress[-1] == (4, 4), f"последний прогресс {seen_progress[-1]}"
+    assert any("✗" in m and "нет прав" in m for m in messages), "ошибка не описана понятно"
+    assert sum(1 for m in messages if m.startswith("✓")) == 3, "не все успехи отмечены"
+    # PDF forces a single worker, other formats use a small pool
+    assert pool_size(10, heavy=True) == 1, "PDF должен идти в один поток"
+    assert pool_size(10, heavy=False) > 1, "не-PDF должен использовать пул"
+    assert pool_size(1, heavy=False) == 1, "для одного файла хватает одного воркера"
+check("Пакетная очередь: прогресс, ошибки, размер пула", t_batch)
+
+# 10h. Folder scan picks only supported files
+def t_scan_folder():
+    from docforge.ui.inputs import scan_folder, summarize
+    d = os.path.join(tmp, "скан")
+    os.makedirs(d, exist_ok=True)
+    for name in ("a.md", "b.DOCX", "c.exe", "d.txt"):
+        open(os.path.join(d, name), "w", encoding="utf-8").close()
+    os.makedirs(os.path.join(d, "вложенная"), exist_ok=True)
+    found = scan_folder(d, ["md", "docx"])
+    names = sorted(os.path.basename(p) for p in found)
+    assert names == ["a.md", "b.DOCX"], f"найдено не то: {names}"
+    assert summarize(found[:1]) == found[0], "один файл показывается полным путём"
+    assert summarize(found).startswith("2 файлов"), "несколько файлов показываются счётчиком"
+check("Сканирование папки и сводка выбора", t_scan_folder)
+
+# 10i. Batch renaming reserves names so two jobs can't collide
+def t_unique_taken():
+    from docforge.core.paths import unique_path
+    d = os.path.join(tmp, "резерв")
+    os.makedirs(d, exist_ok=True)
+    target = os.path.join(d, "f.md")
+    open(target, "w", encoding="utf-8").close()
+    first = unique_path(target)
+    second = unique_path(target, {str(first)})
+    assert first.name == "f-2.md", first.name
+    assert second.name == "f-3.md", second.name
+check("Пакет: резервирование свободных имён", t_unique_taken)
+
 # 11. ffmpeg status (informational)
 def t_ffmpeg():
     from docforge.core import ffmpeg as ffmpeg_helper
