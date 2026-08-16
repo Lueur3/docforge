@@ -6,10 +6,10 @@ log = logging.getLogger(__name__)
 
 
 def available() -> bool:
-    """True, если установлены пакет playwright и браузер Chromium.
+    """True if both the playwright package and a Chromium browser are installed.
 
-    Проверка лёгкая (без запуска браузера): пакет импортируется и в кэше
-    ms-playwright есть папка chromium-*.
+    The check is cheap (no browser launch): the package imports and the
+    ms-playwright cache contains a chromium-* directory.
     """
     try:
         import playwright  # noqa: F401
@@ -20,7 +20,7 @@ def available() -> bool:
 
 
 def html_to_pdf(html_path: str, out_pdf: str, margin: str = "") -> None:
-    """Рендерит локальный HTML в PDF движком Chromium (как браузер)."""
+    """Render a local HTML file to PDF with the Chromium engine (browser-style)."""
     from playwright.sync_api import sync_playwright
 
     pdf_kwargs = {"path": out_pdf, "print_background": True, "format": "A4"}

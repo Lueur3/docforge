@@ -1,13 +1,13 @@
-"""Работа с путями результата: подбор свободного имени, сравнение путей."""
+"""Output path helpers: picking a free name, comparing paths."""
 import itertools
 import os
 from pathlib import Path
 
 
 def unique_path(path: str | Path) -> Path:
-    """Возвращает путь, которого ещё нет: <имя>-2, <имя>-3 и т.д.
+    """Return a path that doesn't exist yet: <name>-2, <name>-3 and so on.
 
-    Работает и для файлов, и для папок (у папки suffix пустой).
+    Works for both files and directories (a directory has an empty suffix).
     """
     p = Path(path)
     if not p.exists():
@@ -17,14 +17,14 @@ def unique_path(path: str | Path) -> Path:
         candidate = parent / f"{stem}-{n}{suffix}"
         if not candidate.exists():
             return candidate
-    raise RuntimeError("unreachable")  # itertools.count бесконечен
+    raise RuntimeError("unreachable")  # itertools.count is infinite
 
 
 def same_file(a: str | Path, b: str | Path) -> bool:
-    """True, если пути указывают на один и тот же файл.
+    """True if both paths point at the same file.
 
-    Сравнение устойчиво к разным написаниям одного пути (слеши, регистр,
-    относительные части); samefile дополнительно ловит жёсткие ссылки.
+    The comparison tolerates different spellings of one path (slashes, case,
+    relative parts); samefile additionally catches hard links.
     """
     pa, pb = Path(a), Path(b)
     try:

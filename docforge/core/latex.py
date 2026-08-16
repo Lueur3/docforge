@@ -8,22 +8,22 @@ from docforge.proc import NO_WINDOW
 
 log = logging.getLogger(__name__)
 
-# Стандартные пути установки MiKTeX — PATH может быть ещё не обновлён
-# в текущем процессе после установки через инсталлер
+# Standard MiKTeX install locations — PATH may not be refreshed in the current
+# process yet right after the installer has run
 _MIKTEX_DIRS = [
     os.path.expandvars(r"%LOCALAPPDATA%\Programs\MiKTeX\miktex\bin\x64"),
     r"C:\Program Files\MiKTeX\miktex\bin\x64",
     r"C:\Program Files (x86)\MiKTeX\miktex\bin",
 ]
 
-# xelatex первым — pdflatex не справляется с кириллицей в Unicode-документах
+# xelatex first — pdflatex cannot handle Cyrillic in Unicode documents
 _ENGINES = ("xelatex", "lualatex", "pdflatex", "tectonic")
 
 _autoinstall_done = False
 
 
 def find_pdf_engine() -> Optional[str]:
-    """Возвращает полный путь к LaTeX-движку или None."""
+    """Return the full path to a LaTeX engine, or None."""
     dirs = [d for d in _MIKTEX_DIRS if os.path.isdir(d)]
     for name in _ENGINES:
         path = shutil.which(name)
@@ -40,17 +40,17 @@ def find_pdf_engine() -> Optional[str]:
 
 
 def is_unicode_engine(engine_path: str) -> bool:
-    """xelatex и lualatex понимают Unicode напрямую (важно для кириллицы)."""
+    """xelatex and lualatex understand Unicode natively (matters for Cyrillic)."""
     name = os.path.basename(engine_path).lower()
     return name.startswith(("xelatex", "lualatex"))
 
 
 def ensure_autoinstall(engine_path: str) -> None:
-    """Включает автоустановку недостающих пакетов MiKTeX (один раз за сессию).
+    """Enable on-the-fly MiKTeX package installation (once per session).
 
-    На свежей системе MiKTeX по умолчанию спрашивает перед установкой
-    каждого пакета. Pandoc запускает движок неинтерактивно, поэтому без
-    этой настройки первая сборка PDF падает с 'package not found'.
+    On a fresh system MiKTeX asks before installing each package. Pandoc runs
+    the engine non-interactively, so without this the first PDF build fails
+    with 'package not found'.
     """
     global _autoinstall_done
     if _autoinstall_done:

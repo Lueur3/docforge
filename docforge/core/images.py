@@ -8,18 +8,18 @@ log = logging.getLogger(__name__)
 
 _DATA_URI_RE = re.compile(r"data:image/([a-zA-Z0-9.+-]+);base64,([A-Za-z0-9+/=]+)")
 
-# mime-подтип → расширение файла, если они не совпадают
+# mime subtype → file extension, where the two differ
 _MIME_EXT = {"jpeg": "jpg", "svg+xml": "svg", "x-emf": "emf", "x-wmf": "wmf"}
 
 
 def decode_data_uris(text: str, media_dir: Path, *, rename_links: bool) -> tuple[str, int]:
-    """Декодирует base64-картинки из текста в media_dir.
+    """Decode base64 images from text into media_dir.
 
-    Возвращает (текст, число_сохранённых_картинок). Одинаковые картинки
-    сохраняются один раз (дедупликация по md5). При rename_links=True
-    data-URI в тексте заменяются на относительные ссылки.
+    Returns (text, number_of_saved_images). Identical images are stored once
+    (md5 dedupe). With rename_links=True the data-URIs in the text are
+    replaced by relative links.
     """
-    saved: dict[str, str] = {}  # md5 → имя файла
+    saved: dict[str, str] = {}  # md5 → file name
 
     def _save(subtype: str, b64: str) -> str | None:
         try:
@@ -48,7 +48,7 @@ def decode_data_uris(text: str, media_dir: Path, *, rename_links: bool) -> tuple
 
 
 def extract_to_markdown_media(md_path: str) -> int:
-    """Извлекает картинки из готового .md в <имя>_media и правит ссылки."""
+    """Extract images from a finished .md into <name>_media and fix the links."""
     p = Path(md_path)
     text = p.read_text(encoding="utf-8")
     media_dir = Path(str(p.with_suffix("")) + "_media")
@@ -60,13 +60,13 @@ def extract_to_markdown_media(md_path: str) -> int:
 
 
 def _extract_pdf_images(input_path: str, dest_dir: str) -> int:
-    """Извлекает встроенные изображения из PDF через PyMuPDF.
+    """Extract embedded images from a PDF via PyMuPDF.
 
-    MarkItDown из PDF достаёт только текст, поэтому для PDF нужен fitz.
+    MarkItDown only pulls text out of PDFs, so PDFs need fitz.
     """
     import fitz  # PyMuPDF
     dest = Path(dest_dir)
-    seen: set[int] = set()  # xref, чтобы не дублировать одну картинку
+    seen: set[int] = set()  # xref, so one image isn't saved twice
     count = 0
     with fitz.open(input_path) as doc:
         for page_index in range(doc.page_count):
@@ -84,10 +84,10 @@ def _extract_pdf_images(input_path: str, dest_dir: str) -> int:
 
 
 def extract_images_only(input_path: str, dest_dir: str) -> int:
-    """Извлекает изображения из файла в dest_dir.
+    """Extract images from a file into dest_dir.
 
-    PDF — через PyMuPDF (fitz); остальные форматы — через MarkItDown
-    (base64 data-URI). Markdown-результат не сохраняется.
+    PDFs go through PyMuPDF (fitz); other formats through MarkItDown
+    (base64 data-URIs). The Markdown result is not kept.
     """
     log.info("Извлечение изображений: вход=%s → папка=%s", input_path, dest_dir)
     if Path(input_path).suffix.lower() == ".pdf":

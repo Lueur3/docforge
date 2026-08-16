@@ -132,12 +132,12 @@ class SetupDialog(QDialog):
     def _on_done(self, success: bool, error: str) -> None:
         if not success:
             QMessageBox.warning(self, "Ошибка установки", error)
-            # критично выйти только если на первом запуске не встало ядро
+            # only fatal when the core failed to install on the first run
             if self._first_run and not (markitdown_installed() and pandoc_installed()):
                 sys.exit(1)
             self._btn.setEnabled(True)
             return
-        # ffmpeg мог только что установиться — подключаем его к pydub сразу
+        # ffmpeg may have just been installed — hand it to pydub right away
         path = ffmpeg.find_ffmpeg()
         if path:
             ffmpeg.configure_pydub(path)
@@ -149,17 +149,17 @@ class SetupDialog(QDialog):
 
 
 def open_components_dialog() -> None:
-    """Открывает диалог компонентов в режиме управления (не первый запуск)."""
+    """Open the components dialog in manage mode (not a first run)."""
     log.info("Открытие диалога компонентов")
     SetupDialog(first_run=False).exec()
 
 
 def ensure_dependencies(_app: QApplication) -> None:
-    """Показывает окно настройки при первом запуске или если ядро не установлено.
+    """Show the setup window on first run, or when the core is missing.
 
-    Быстрый путь не импортирует markitdown и не запускает Pandoc — маркер
-    пишется только после успешной установки, поэтому наличия пакетов
-    достаточно. Тяжёлые проверки — внутри SetupDialog."""
+    The fast path neither imports markitdown nor spawns Pandoc — the marker is
+    only written after a successful install, so the presence of the packages is
+    enough. The expensive checks live inside SetupDialog."""
     if core_ready():
         log.debug("Зависимости на месте, окно настройки пропущено")
         return

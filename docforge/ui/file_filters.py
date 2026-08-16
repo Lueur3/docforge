@@ -1,4 +1,4 @@
-"""Фильтры расширений для QFileDialog — показывать только подходящие файлы."""
+"""Extension filters for QFileDialog — show only files that can be handled."""
 
 _ALL = "Все файлы (*)"
 
@@ -8,7 +8,7 @@ def _filter(title: str, exts: list[str]) -> str:
     return f"{title} ({mask});;{_ALL}"
 
 
-# MarkItDown: документы, таблицы, веб, изображения, архивы, аудио
+# MarkItDown: documents, spreadsheets, web, images, archives, audio
 MARKITDOWN_INPUT = _filter(
     "Поддерживаемые файлы",
     ["pdf", "docx", "pptx", "xlsx", "xls", "html", "htm", "csv", "json",
@@ -16,14 +16,14 @@ MARKITDOWN_INPUT = _filter(
      "webp", "mp3", "wav", "m4a", "zip"],
 )
 
-# Pandoc: форматы, которые он умеет читать
+# Pandoc: the formats it can read
 PANDOC_INPUT = _filter(
     "Поддерживаемые файлы",
     ["md", "markdown", "docx", "odt", "epub", "html", "htm", "rst", "tex",
      "latex", "txt", "rtf", "csv", "json", "org", "ipynb"],
 )
 
-# Извлечение изображений: форматы, в которых встречаются встроенные картинки
+# Image extraction: formats that carry embedded images
 IMAGES_INPUT = _filter(
     "Файлы с изображениями",
     ["docx", "pptx", "xlsx", "pdf", "odt", "epub", "html", "htm"],

@@ -1,1 +1,1 @@
-"""Интерфейс DocForge (PyQt6)."""
+"""DocForge user interface (PyQt6)."""

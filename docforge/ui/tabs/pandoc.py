@@ -52,7 +52,7 @@ class _ConvertWorker(QThread):
                 self._input, in_ext, size, self._writer, self._output, self._standalone,
             )
 
-            # Chromium — отдельный путь: pandoc делает HTML, Chromium печатает PDF
+            # Chromium takes a separate route: pandoc makes HTML, Chromium prints the PDF
             if self._writer == "pdf" and self._pdf_engine == "chromium":
                 self._convert_via_chromium()
                 return
@@ -75,24 +75,24 @@ class _ConvertWorker(QThread):
                 latex.ensure_autoinstall(engine)
                 extra.append(f"--pdf-engine={engine}")
                 if latex.is_unicode_engine(engine):
-                    # системный шрифт с поддержкой кириллицы
+                    # a system font that covers Cyrillic
                     extra += ["-V", "mainfont=Segoe UI"]
                 if self._margin:
                     extra += ["-V", f"geometry:margin={self._margin}"]
             elif self._writer == "html":
-                # картинки из docx/odt/epub встраиваются прямо в html
+                # images from docx/odt/epub get embedded straight into the html
                 extra.append("--embed-resources")
             media_dir: Optional[str] = None
             if self._writer in ("markdown", "rst", "latex"):
-                # картинки извлекаются в папку рядом с выходным файлом
+                # images are extracted into a folder next to the output file
                 media_dir = str(Path(self._output).with_suffix("")) + "_media"
                 extra.append(f"--extract-media={media_dir}")
 
-            # пользовательские опции
+            # user-selected options
             if self._toc:
                 extra.append("--toc")
                 if "--standalone" not in extra:
-                    extra.append("--standalone")  # оглавление требует полный документ
+                    extra.append("--standalone")  # a TOC needs a full document
             if self._number_sections:
                 extra.append("--number-sections")
             if self._highlight == "--no-highlight":
@@ -102,8 +102,8 @@ class _ConvertWorker(QThread):
 
             writer = self._writer
             if writer == "markdown":
-                # без pandoc-атрибутов {width=...} и без raw-HTML <img> —
-                # иначе картинки не рендерятся в VS Code, GitHub, Obsidian
+                # no pandoc {width=...} attributes and no raw-HTML <img> —
+                # otherwise the images don't render in common viewers
                 writer = "markdown-link_attributes-raw_html"
 
             log.debug("Pandoc: pypandoc.convert_file writer=%s extra_args=%s", writer, extra)
@@ -137,7 +137,7 @@ class _ConvertWorker(QThread):
             self.done.emit(False)
 
     def _convert_via_chromium(self) -> None:
-        """PDF через Chromium: pandoc делает самодостаточный HTML, Chromium печатает."""
+        """PDF via Chromium: pandoc makes a self-contained HTML, Chromium prints it."""
         import tempfile
         import pypandoc
 
@@ -176,11 +176,10 @@ class _ConvertWorker(QThread):
                     os.remove(tmp_html)
 
     def _relativize_media_paths(self, media_dir: str) -> None:
-        """Заменяет абсолютные пути к картинкам на относительные.
+        """Rewrite absolute image paths as relative ones.
 
-        Pandoc записывает в --extract-media абсолютный путь как есть,
-        из-за чего ссылки не работают при переносе файла и не рендерятся
-        в большинстве просмотрщиков.
+        Pandoc writes the --extract-media path verbatim, so the links break
+        when the file is moved and fail to render in most viewers.
         """
         out = Path(self._output)
         try:
@@ -213,7 +212,7 @@ class PandocTab(QWidget):
         layout.setSpacing(8)
         layout.setContentsMargins(16, 16, 16, 16)
 
-        # Входной файл
+        # Input file
         layout.addWidget(QLabel("Входной файл:"))
         row_in = QHBoxLayout()
         self._input_edit = QLineEdit()
@@ -226,7 +225,7 @@ class PandocTab(QWidget):
         row_in.addWidget(btn_in)
         layout.addLayout(row_in)
 
-        # Формат вывода
+        # Output format
         layout.addWidget(QLabel("Формат вывода:"))
         self._fmt_combo = QComboBox()
         for label, _writer, ext, _standalone in FORMATS:
@@ -234,7 +233,7 @@ class PandocTab(QWidget):
         self._fmt_combo.currentIndexChanged.connect(self._on_format_changed)
         layout.addWidget(self._fmt_combo)
 
-        # Выходной файл
+        # Output file
         layout.addWidget(QLabel("Выходной файл:"))
         row_out = QHBoxLayout()
         self._output_edit = QLineEdit()
@@ -247,7 +246,7 @@ class PandocTab(QWidget):
         row_out.addWidget(btn_out)
         layout.addLayout(row_out)
 
-        # Настройки (свёрнуты по умолчанию)
+        # Settings (collapsed by default)
         self._settings_btn = QPushButton("Настройки ▸")
         self._settings_btn.setCheckable(True)
         self._settings_btn.setFixedHeight(24)
@@ -258,34 +257,34 @@ class PandocTab(QWidget):
         self._settings_box.hide()
         layout.addWidget(self._settings_box)
 
-        # Кнопка конвертации
+        # Convert button
         self._convert_btn = QPushButton("Конвертировать")
         self._convert_btn.setObjectName("btn_convert")
         self._convert_btn.setFixedHeight(36)
         self._convert_btn.clicked.connect(self._run_convert)
         layout.addWidget(self._convert_btn)
 
-        # строка статуса + «Подробнее»
+        # status line + details button
         self._log = StatusLog()
         layout.addWidget(self._log)
 
-        # растяжка внизу прижимает содержимое вверх — без больших отступов
+        # trailing stretch pins the content to the top — no large gaps
         layout.addStretch()
 
-        # восстанавливаем последний формат (после того как combo заполнен)
+        # restore the last format (after the combo has been filled)
         _fi = self._fmt_combo.findData(settings.get_str("pandoc/format", "md"))
         if _fi >= 0:
             self._fmt_combo.setCurrentIndex(_fi)
         self._update_pdf_controls()
 
     def _build_settings_box(self) -> QWidget:
-        """Собирает свёрнутую панель настроек (опции Pandoc + параметры PDF)."""
+        """Build the collapsible settings panel (Pandoc options + PDF params)."""
         box = QWidget()
         sbox = QVBoxLayout(box)
         sbox.setContentsMargins(0, 0, 0, 0)
         sbox.setSpacing(6)
 
-        # Опции Pandoc
+        # Pandoc options
         opt_row = QHBoxLayout()
         opt_row.setSpacing(12)
         self._toc_chk = QCheckBox("Оглавление")
@@ -308,12 +307,12 @@ class PandocTab(QWidget):
         opt_row.addStretch()
         sbox.addLayout(opt_row)
 
-        # Параметры PDF (активны только для формата PDF)
+        # PDF parameters (enabled only when the output format is PDF)
         pdf_row = QHBoxLayout()
         pdf_row.setSpacing(8)
         pdf_row.addWidget(QLabel("PDF — движок:"))
         self._engine_combo = QComboBox()
-        # Chromium первым — движок PDF по умолчанию
+        # Chromium first — the default PDF engine
         self._engine_combo.addItem("Chromium (как браузер)", "chromium")
         self._engine_combo.addItem("xelatex (LaTeX)", "latex")
         _ei = self._engine_combo.findData(settings.get_str("pandoc/engine", "chromium"))
@@ -340,7 +339,7 @@ class PandocTab(QWidget):
         self._settings_btn.setText("Настройки ▾" if checked else "Настройки ▸")
 
     def _update_pdf_controls(self) -> None:
-        """Движок и поля активны только для формата PDF."""
+        """Engine and margins are only enabled for the PDF format."""
         is_pdf = self._current_ext() == "pdf"
         self._engine_combo.setEnabled(is_pdf)
         self._margin_edit.setEnabled(is_pdf)
@@ -356,7 +355,7 @@ class PandocTab(QWidget):
 
     def _set_input(self, path: str) -> None:
         self._input_edit.setText(path)
-        # путь вывода всегда следует за новым входным файлом
+        # the output path always follows the newly chosen input
         self._output_edit.setText(str(Path(path).with_suffix(f".{self._current_ext()}")))
         settings.remember_dir(path)
 

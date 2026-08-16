@@ -16,14 +16,14 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-ffmpeg = ["imageio-ffmpeg"]     # аудио/видео в MarkItDown
-chromium = ["playwright"]        # PDF через Chromium (+ python -m playwright install chromium)
+ffmpeg = ["imageio-ffmpeg"]     # audio/video support in MarkItDown
+chromium = ["playwright"]        # PDF via Chromium (+ python -m playwright install chromium)
 
 [project.scripts]
 docforge = "docforge.app:main"
 
 [tool.setuptools.packages.find]
-include = ["docforge*"]   # без этого setuptools захватил бы и tests/
+include = ["docforge*"]   # without this setuptools would also pick up tests/
 
 [tool.setuptools.package-data]
 docforge = ["resources/*.ico"]

@@ -6,7 +6,7 @@ log = logging.getLogger(__name__)
 
 
 def find_ffmpeg() -> Optional[str]:
-    """Ищет ffmpeg: сначала в системном PATH, потом в imageio-ffmpeg."""
+    """Look for ffmpeg: system PATH first, then the imageio-ffmpeg binary."""
     path = shutil.which("ffmpeg")
     if path:
         return path
@@ -18,7 +18,7 @@ def find_ffmpeg() -> Optional[str]:
 
 
 def configure_pydub(ffmpeg_path: str) -> None:
-    """Указывает pydub на нужный бинарник ffmpeg."""
+    """Point pydub at the ffmpeg binary we found."""
     try:
         import pydub
         pydub.AudioSegment.converter = ffmpeg_path

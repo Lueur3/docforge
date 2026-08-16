@@ -85,12 +85,12 @@ git clone https://github.com/Lueur3/docforge.git
 cd docforge
 python -m venv .venv
 .venv\Scripts\activate
-pip install -r requirements.txt
+pip install -e .
 python main.py
 ```
 
-Виртуальное окружение необязательно, но рекомендуется. Как вариант — установить сам пакет
-(`pip install -e .`): `pyproject.toml` описывает зависимости и точку входа `docforge`.
+Зависимости описаны в `pyproject.toml`, поэтому `pip install -e .` ставит всё нужное и
+заодно регистрирует команду `docforge`. Виртуальное окружение необязательно, но рекомендуется.
 
 Дальше запускайте приложение двойным кликом по **DocForge.bat**.
 Если приложение не запускается, запустите **DocForge-debug.bat** — он покажет текст ошибки.

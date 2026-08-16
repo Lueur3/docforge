@@ -1,6 +1,6 @@
 import subprocess
 import sys
 
-# Флаг для subprocess: не показывать окно консоли при запуске из pythonw
-# (GUI без терминала). На не-Windows флага нет — значение 0.
+# subprocess flag: don't flash a console window when running under pythonw
+# (GUI without a terminal). The flag doesn't exist off Windows — use 0 there.
 NO_WINDOW = subprocess.CREATE_NO_WINDOW if sys.platform == "win32" else 0

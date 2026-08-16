@@ -6,8 +6,8 @@ from docforge.core import images
 
 log = logging.getLogger(__name__)
 
-# Текстовые форматы, для которых автоопределение кодировки может ошибаться
-# (charset-normalizer на системах с не-латинской локалью путает UTF-8 с cp125x)
+# Text formats where charset autodetection can go wrong (charset-normalizer
+# mistakes UTF-8 for cp125x on systems with a non-Latin locale)
 _TEXT_EXTENSIONS = {".html", ".htm", ".txt", ".md", ".csv", ".json", ".xml"}
 
 
@@ -22,7 +22,7 @@ def _is_valid_utf8(path: str) -> bool:
 
 def convert_to_markdown(input_path: str, output_path: str,
                         extract_images: bool = False) -> int:
-    """Конвертирует файл в Markdown. Возвращает число извлечённых картинок."""
+    """Convert a file to Markdown. Returns the number of extracted images."""
     from markitdown import MarkItDown, StreamInfo
     ext = Path(input_path).suffix.lower()
     size = os.path.getsize(input_path) if os.path.isfile(input_path) else -1
@@ -35,7 +35,7 @@ def convert_to_markdown(input_path: str, output_path: str,
         kwargs["stream_info"] = StreamInfo(charset="utf-8")
         log.debug("MarkItDown: применена подсказка кодировки UTF-8")
     if extract_images:
-        # иначе MarkItDown пишет обрезанный 'data:image/png;base64...'
+        # otherwise MarkItDown writes a truncated 'data:image/png;base64...'
         kwargs["keep_data_uris"] = True
     result = MarkItDown().convert(input_path, **kwargs)
     with open(output_path, "w", encoding="utf-8") as f:

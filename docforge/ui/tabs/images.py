@@ -61,7 +61,7 @@ class ImagesTab(QWidget):
 
         layout.addWidget(QLabel("Извлечение изображений из файла (docx, pptx, pdf, epub и др.)"))
 
-        # Входной файл
+        # Input file
         layout.addWidget(QLabel("Входной файл:"))
         row_in = QHBoxLayout()
         self._input_edit = QLineEdit()
@@ -74,7 +74,7 @@ class ImagesTab(QWidget):
         row_in.addWidget(btn_in)
         layout.addLayout(row_in)
 
-        # Папка назначения
+        # Destination folder
         layout.addWidget(QLabel("Папка для изображений:"))
         row_out = QHBoxLayout()
         self._dest_edit = QLineEdit()
@@ -87,24 +87,24 @@ class ImagesTab(QWidget):
         row_out.addWidget(btn_out)
         layout.addLayout(row_out)
 
-        # Кнопка
+        # Action button
         self._extract_btn = QPushButton("Извлечь изображения")
         self._extract_btn.setObjectName("btn_convert")
         self._extract_btn.setFixedHeight(36)
         self._extract_btn.clicked.connect(self._run_extract)
         layout.addWidget(self._extract_btn)
 
-        # строка статуса + «Подробнее»
+        # status line + details button
         self._log = StatusLog()
         layout.addWidget(self._log)
 
-        # растяжка внизу прижимает содержимое вверх — без больших отступов
+        # trailing stretch pins the content to the top — no large gaps
         layout.addStretch()
 
     def _set_input(self, path: str) -> None:
         self._input_edit.setText(path)
-        # путь назначения всегда следует за новым файлом: <имя>_images рядом с ним;
-        # папка создаётся автоматически при извлечении — заранее создавать не нужно
+        # the destination always follows the new file: <name>_images next to it;
+        # the folder is created during extraction — no need to make it first
         self._dest_edit.setText(str(Path(path).with_suffix("")) + "_images")
         settings.remember_dir(path)
 
@@ -131,8 +131,8 @@ class ImagesTab(QWidget):
         folder = QFileDialog.getExistingDirectory(self, "Выбрать папку для сохранения", initial)
         if not folder:
             return
-        # выбирается родительская папка — имя <файл>_images добавляем сами,
-        # иначе пользователю пришлось бы дописывать его вручную
+        # the dialog picks a parent folder — we append <file>_images ourselves,
+        # otherwise the user would have to type the folder name by hand
         input_path = self._input_edit.text().strip()
         if input_path:
             name = Path(input_path).stem + "_images"

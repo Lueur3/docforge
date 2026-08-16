@@ -13,15 +13,15 @@ from docforge.proc import NO_WINDOW
 
 log = logging.getLogger(__name__)
 
-# Маркер завершённой первичной настройки (пишется после успешной установки ядра)
+# Marker of a completed first-run setup (written after the core installs)
 MARKER = Path(os.getenv("APPDATA", str(Path.home()))) / "DocForge" / "setup_done"
 
 
 def module_present(name: str) -> bool:
-    """Проверяет установку пакета без его импорта.
+    """Check that a package is installed without importing it.
 
-    import markitdown тянет onnxruntime/magika и занимает ~1.5 с —
-    недопустимо на старте. find_spec проверяет наличие за доли миллисекунды.
+    `import markitdown` pulls in onnxruntime/magika and costs ~1.5 s — too
+    much at startup. find_spec answers in a fraction of a millisecond.
     """
     try:
         return importlib.util.find_spec(name) is not None
@@ -34,10 +34,10 @@ def markitdown_installed() -> bool:
 
 
 def pandoc_installed() -> bool:
-    """Полная проверка: пакет pypandoc + доступный бинарник Pandoc.
+    """Full check: the pypandoc package plus a usable Pandoc binary.
 
-    Вызывает Pandoc как процесс, поэтому используется только в окне
-    настройки, а не на быстром старте."""
+    Spawns Pandoc as a process, so it is only used in the setup dialog,
+    never on the fast startup path."""
     try:
         import pypandoc
         pypandoc.get_pandoc_version()
@@ -47,7 +47,7 @@ def pandoc_installed() -> bool:
 
 
 class SetupWorker(QThread):
-    """Устанавливает выбранные компоненты в фоне."""
+    """Installs the selected components in the background."""
 
     status = pyqtSignal(str)
     done   = pyqtSignal(bool, str)
@@ -105,8 +105,8 @@ class SetupWorker(QThread):
             if self._miktex:
                 self.status.emit("Установка MiKTeX через winget (может занять 5–10 минут)...")
                 self._winget("MiKTeX.MiKTeX")
-                # включаем автоустановку LaTeX-пакетов, иначе первая
-                # сборка PDF падает на неинтерактивном запросе пакета
+                # turn on on-the-fly LaTeX package installation, otherwise the
+                # first PDF build dies on a non-interactive package prompt
                 engine = latex.find_pdf_engine()
                 if engine:
                     latex.ensure_autoinstall(engine)
@@ -135,5 +135,5 @@ def mark_setup_done() -> None:
 
 
 def core_ready() -> bool:
-    """Быстрая проверка готовности ядра (без запуска Pandoc)."""
+    """Fast check that the core is ready (without spawning Pandoc)."""
     return MARKER.exists() and module_present("markitdown") and module_present("pypandoc")

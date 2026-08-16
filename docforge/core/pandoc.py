@@ -1,7 +1,7 @@
-"""Справочные данные форматов и опций Pandoc (без UI)."""
+"""Pandoc format and option tables (data only, no UI)."""
 
-# Стили подсветки кода Pandoc; "" — не передавать флаг (стиль по умолчанию),
-# "--no-highlight" — отключить подсветку.
+# Pandoc code-highlight styles; "" means don't pass the flag (engine default),
+# "--no-highlight" disables highlighting altogether.
 HIGHLIGHT_STYLES = [
     ("По умолчанию", ""),
     ("pygments", "pygments"),
@@ -15,8 +15,8 @@ HIGHLIGHT_STYLES = [
     ("Без подсветки", "--no-highlight"),
 ]
 
-# Форматы вывода: (отображаемое имя, writer для pandoc, расширение, флаг --standalone).
-# Pandoc всегда читает и пишет UTF-8 — отдельные флаги кодировки не нужны.
+# Output formats: (display name, pandoc writer, extension, needs --standalone).
+# Pandoc always reads and writes UTF-8 — no encoding flags required.
 FORMATS: list[tuple[str, str, str, bool]] = [
     ("Markdown",         "markdown", "md",   False),
     ("HTML",             "html",     "html", True),

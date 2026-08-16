@@ -11,8 +11,8 @@ LOG_FILE = LOG_DIR / "docforge.log"
 _FORMAT = "%(asctime)s | %(levelname)-7s | %(name)s.%(funcName)s:%(lineno)d | %(message)s"
 _DATEFMT = "%Y-%m-%d %H:%M:%S"
 
-# Сторонние библиотеки на DEBUG генерируют тысячи строк (особенно pdfminer
-# при чтении PDF) — это забивает лог и сильно замедляет конвертацию.
+# Third-party libraries at DEBUG emit thousands of lines (pdfminer especially,
+# while reading a PDF) — that floods the log and slows conversion down badly.
 _NOISY_LOGGERS = (
     "pdfminer", "pdfplumber", "PIL", "fontTools", "markdown_it",
     "urllib3", "charset_normalizer", "matplotlib", "comtypes",
@@ -38,17 +38,17 @@ def _log_environment(log: logging.Logger) -> None:
 
 
 def _qt_message_handler(mode, context, message: str) -> None:
-    """Перенаправляет внутренние предупреждения Qt в лог."""
+    """Route Qt's internal warnings into our log."""
     logging.getLogger("Qt").warning("%s", message)
 
 
 def setup_logging() -> Path:
-    """Настраивает корневой логгер: файл с ротацией + консоль (если есть).
+    """Configure the root logger: rotating file + console (when there is one).
 
-    Возвращает путь к файлу лога. Безопасно при повторном вызове.
+    Returns the log file path. Safe to call more than once.
     """
     root = logging.getLogger()
-    if root.handlers:  # уже настроен
+    if root.handlers:  # already configured
         return LOG_FILE
 
     LOG_DIR.mkdir(parents=True, exist_ok=True)
@@ -65,15 +65,15 @@ def setup_logging() -> Path:
     for noisy in _NOISY_LOGGERS:
         logging.getLogger(noisy).setLevel(logging.WARNING)
 
-    # консоль доступна только при запуске через python/DocForge-debug.bat;
-    # под pythonw sys.stderr is None — тогда консольный обработчик не нужен
+    # a console only exists when started via python/DocForge-debug.bat;
+    # under pythonw sys.stderr is None, so no console handler is needed
     if sys.stderr is not None:
         console = logging.StreamHandler()
         console.setLevel(logging.INFO)
         console.setFormatter(fmt)
         root.addHandler(console)
 
-    # необработанные исключения — в лог с полным трейсбеком
+    # uncaught exceptions go to the log with a full traceback
     def _excepthook(exc_type, exc_value, exc_tb):
         logging.getLogger("uncaught").critical(
             "Необработанное исключение", exc_info=(exc_type, exc_value, exc_tb)

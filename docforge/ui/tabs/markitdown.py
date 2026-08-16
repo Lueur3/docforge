@@ -62,7 +62,7 @@ class MarkItDownTab(QWidget):
         layout.setSpacing(8)
         layout.setContentsMargins(16, 16, 16, 16)
 
-        # Входной файл
+        # Input file
         layout.addWidget(QLabel("Входной файл:"))
         row_in = QHBoxLayout()
         self._input_edit = QLineEdit()
@@ -75,7 +75,7 @@ class MarkItDownTab(QWidget):
         row_in.addWidget(btn_in)
         layout.addLayout(row_in)
 
-        # Выходной файл
+        # Output file
         layout.addWidget(QLabel("Выходной файл (.md):"))
         row_out = QHBoxLayout()
         self._output_edit = QLineEdit()
@@ -88,7 +88,7 @@ class MarkItDownTab(QWidget):
         row_out.addWidget(btn_out)
         layout.addLayout(row_out)
 
-        # Извлечение картинок (состояние запоминается между запусками)
+        # Image extraction (the state is remembered between launches)
         self._extract_chk = QCheckBox("Извлекать изображения в папку рядом с файлом")
         self._extract_chk.setChecked(settings.get_bool("markitdown/extract_images", True))
         self._extract_chk.toggled.connect(
@@ -96,23 +96,23 @@ class MarkItDownTab(QWidget):
         )
         layout.addWidget(self._extract_chk)
 
-        # Кнопка конвертации
+        # Convert button
         self._convert_btn = QPushButton("Конвертировать")
         self._convert_btn.setObjectName("btn_convert")
         self._convert_btn.setFixedHeight(36)
         self._convert_btn.clicked.connect(self._run_convert)
         layout.addWidget(self._convert_btn)
 
-        # строка статуса + «Подробнее»
+        # status line + details button
         self._log = StatusLog()
         layout.addWidget(self._log)
 
-        # растяжка внизу прижимает содержимое вверх — без больших отступов
+        # trailing stretch pins the content to the top — no large gaps
         layout.addStretch()
 
     def _set_input(self, path: str) -> None:
         self._input_edit.setText(path)
-        # путь вывода всегда следует за новым входным файлом
+        # the output path always follows the newly chosen input
         self._output_edit.setText(str(Path(path).with_suffix(".md")))
         settings.remember_dir(path)
 

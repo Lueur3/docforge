@@ -1,7 +1,7 @@
-"""Smoke-тест DocForge: проверяет все пути конвертации без GUI.
+"""DocForge smoke test: exercises every conversion path without a GUI.
 
-Запуск: python smoke_test.py
-Не входит в приложение — только для проверки работоспособности.
+Run: python tests/test_smoke.py
+Not part of the app — a self-check only.
 """
 import os
 import sys
@@ -9,7 +9,7 @@ import tempfile
 
 sys.stdout.reconfigure(encoding="utf-8")
 
-# пакет лежит в корне репозитория, тест — в tests/
+# the package sits at the repo root, this test lives in tests/
 _ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, _ROOT)
 
@@ -26,7 +26,7 @@ CYRILLIC_MD = (
 MARKER = "Привет, мир!"
 
 tmp = tempfile.mkdtemp(prefix="docforge_smoke_")
-src_md = os.path.join(tmp, "тест входной.md")  # кириллица и пробел в имени файла
+src_md = os.path.join(tmp, "тест входной.md")  # Cyrillic and a space in the file name
 with open(src_md, "w", encoding="utf-8") as f:
     f.write(CYRILLIC_MD)
 
@@ -39,7 +39,7 @@ def check(name: str, fn) -> None:
         results.append((FAIL, f"{name} — {type(e).__name__}: {e}"))
 
 
-# 1. Импорты приложения
+# 1. Application imports
 def t_imports():
     from docforge import app, theme, logging_setup, proc  # noqa
     from docforge.core import (  # noqa
@@ -49,14 +49,14 @@ def t_imports():
     from docforge.ui.tabs import markitdown as t_md, pandoc as t_pd, images as t_im  # noqa
 check("Импорт всех модулей приложения", t_imports)
 
-# 2. Pandoc установлен
+# 2. Pandoc is available
 def t_pandoc_version():
     import pypandoc
     v = pypandoc.get_pandoc_version()
     print(f"   pandoc {v}")
 check("Pandoc доступен", t_pandoc_version)
 
-# 3. Pandoc: все форматы из вкладки (кроме pdf — отдельно)
+# 3. Pandoc: every format from the tab (pdf is handled separately)
 from docforge.core.pandoc import FORMATS
 
 def make_pandoc_test(writer: str, ext: str, standalone: bool):
@@ -66,7 +66,7 @@ def make_pandoc_test(writer: str, ext: str, standalone: bool):
         extra = ["--standalone"] if standalone else []
         pypandoc.convert_file(src_md, writer, outputfile=out, extra_args=extra)
         assert os.path.getsize(out) > 0, "пустой выходной файл"
-        # для текстовых форматов проверяем что кириллица уцелела
+        # for text formats, check the Cyrillic survived
         if ext in ("html", "rst", "txt", "tex", "md"):
             with open(out, encoding="utf-8") as f:
                 content = f.read()
@@ -78,7 +78,7 @@ for label, writer, ext, standalone in FORMATS:
         continue
     check(f"Pandoc: md → .{ext} ({label})", make_pandoc_test(writer, ext, standalone))
 
-# 4. Pandoc: PDF (та же логика, что в _ConvertWorker)
+# 4. Pandoc: PDF (same logic as _ConvertWorker)
 def t_pdf():
     import pypandoc
     from docforge.core import latex as pdf_helper
@@ -90,7 +90,7 @@ def t_pdf():
     extra = [f"--pdf-engine={engine}"]
     if pdf_helper.is_unicode_engine(engine):
         extra += ["-V", "mainfont=Segoe UI"]
-    extra += ["-V", "geometry:margin=2cm"]  # поля по умолчанию (как в приложении)
+    extra += ["-V", "geometry:margin=2cm"]  # default margins, as in the app
     pypandoc.convert_file(src_md, "pdf", outputfile=out, extra_args=extra)
     assert os.path.getsize(out) > 0
     results.append((PASS, f"Pandoc: md → .pdf, поля 2cm (движок: {os.path.basename(engine)})"))
@@ -99,7 +99,7 @@ try:
 except Exception as e:
     results.append((FAIL, f"Pandoc: md → .pdf — {e}"))
 
-# 4b. Chromium-движок: доступность (информационно)
+# 4b. Chromium engine: availability (informational)
 def t_chromium():
     from docforge.core import chromium as chromium_pdf
     if chromium_pdf.available():
@@ -108,17 +108,17 @@ def t_chromium():
         results.append((SKIP, "Chromium (Playwright): не установлен (опционально)"))
 t_chromium()
 
-# 5. Pandoc: обратное направление docx → md
+# 5. Pandoc: the reverse direction, docx -> md
 def t_docx_to_md():
     import pypandoc
-    docx = os.path.join(tmp, "out.docx")  # создан тестом выше
+    docx = os.path.join(tmp, "out.docx")  # created by an earlier check
     back = os.path.join(tmp, "обратно.md")
     pypandoc.convert_file(docx, "markdown", outputfile=back)
     with open(back, encoding="utf-8") as f:
         assert MARKER in f.read(), "кириллица потеряна при docx → md"
 check("Pandoc: docx → md (обратное направление)", t_docx_to_md)
 
-# 6. MarkItDown: docx → md (тот же код, что выполняет вкладка MarkItDown)
+# 6. MarkItDown: docx -> md (the same code the MarkItDown tab runs)
 from docforge.core.markitdown import convert_to_markdown
 
 def t_markitdown():
@@ -138,10 +138,10 @@ def t_markitdown_html():
         assert MARKER in f.read(), "кириллица потеряна (html)"
 check("MarkItDown: html → md с кириллицей", t_markitdown_html)
 
-# 8. Pandoc: картинки из docx попадают в html (--embed-resources)
+# 8. Pandoc: images from docx end up in the html (--embed-resources)
 def t_images_html():
     import pypandoc
-    # делаем docx с картинкой: png 1x1 + md со ссылкой на неё
+    # build a docx with an image: a 1x1 png plus md linking to it
     png = os.path.join(tmp, "pix.png")
     with open(png, "wb") as f:
         f.write(bytes.fromhex(
@@ -154,7 +154,7 @@ def t_images_html():
         f.write(f"# Картинка\n\n![тест]({png})\n")
     docx = os.path.join(tmp, "img.docx")
     pypandoc.convert_file(md_img, "docx", outputfile=docx)
-    # docx → html как делает вкладка Pandoc
+    # docx -> html the way the Pandoc tab does it
     html = os.path.join(tmp, "img.html")
     pypandoc.convert_file(docx, "html", outputfile=html,
                           extra_args=["--standalone", "--embed-resources"])
@@ -162,15 +162,15 @@ def t_images_html():
         assert "data:image" in f.read(), "картинка не встроена в html"
 check("Pandoc: картинка из docx встроена в html", t_images_html)
 
-# 9. Pandoc: docx → md с картинкой — пути относительные, без {width=...}
+# 9. Pandoc: docx -> md with an image — relative paths, no {width=...}
 def t_images_md():
     import pypandoc
-    docx = os.path.join(tmp, "img.docx")  # создан тестом выше
+    docx = os.path.join(tmp, "img.docx")  # created by an earlier check
     out = os.path.join(tmp, "img_out.md")
     media = os.path.splitext(out)[0] + "_media"
     pypandoc.convert_file(docx, "markdown-link_attributes-raw_html", outputfile=out,
                           extra_args=[f"--extract-media={media}"])
-    # та же пост-обработка, что в _ConvertWorker._relativize_media_paths
+    # the same post-processing as _ConvertWorker._relativize_media_paths
     import urllib.parse
     text = open(out, encoding="utf-8").read()
     rel = os.path.basename(media)
@@ -185,7 +185,7 @@ def t_images_md():
     assert os.path.isdir(media), "папка с медиа не создана"
 check("Pandoc: docx → md, картинки с относительными путями", t_images_md)
 
-# 9b. Логирование: setup_logging создаёт файл и пишет в него
+# 9b. Logging: setup_logging creates the file and writes to it
 def t_logging():
     import logging
     from docforge import logging_setup
@@ -199,9 +199,9 @@ def t_logging():
     assert "DocForge — старт сессии" in content, "окружение не залогировано"
 check("Логирование: запись в файл работает", t_logging)
 
-# 10. MarkItDown: извлечение встроенных изображений из docx
+# 10. MarkItDown: extracting embedded images from docx
 def t_markitdown_images():
-    docx = os.path.join(tmp, "img.docx")  # создан тестом выше
+    docx = os.path.join(tmp, "img.docx")  # created by an earlier check
     out = os.path.join(tmp, "mid_img.md")
     count = convert_to_markdown(docx, out, extract_images=True)
     assert count >= 1, f"картинки не извлечены (count={count})"
@@ -212,21 +212,21 @@ def t_markitdown_images():
     assert "mid_img_media/" in text, "нет относительной ссылки на картинку"
 check("MarkItDown: извлечение изображений из docx", t_markitdown_images)
 
-# 10b. Извлечение изображений в произвольную папку (вкладка «Изображения»)
+# 10b. Extracting images into an arbitrary folder (the Images tab)
 def t_images_only():
     from docforge.core import images as image_extract
-    docx = os.path.join(tmp, "img.docx")  # создан тестом выше
+    docx = os.path.join(tmp, "img.docx")  # created by an earlier check
     dest = os.path.join(tmp, "только_картинки")
     count = image_extract.extract_images_only(docx, dest)
     assert count >= 1, f"картинки не извлечены (count={count})"
     assert os.path.isdir(dest) and os.listdir(dest), "папка назначения пуста"
 check("Изображения: извлечение из docx в выбранную папку", t_images_only)
 
-# 10c. Извлечение изображений из PDF (PyMuPDF)
+# 10c. Extracting images from a PDF (PyMuPDF)
 def t_pdf_images():
     import fitz  # PyMuPDF
     from docforge.core import images as image_extract
-    # валидную картинку генерируем самим PyMuPDF
+    # generate a valid image with PyMuPDF itself
     pix = fitz.Pixmap(fitz.csRGB, fitz.IRect(0, 0, 40, 40))
     pix.clear_with(128)
     img_bytes = pix.tobytes("png")
@@ -242,21 +242,21 @@ def t_pdf_images():
     assert os.path.isdir(dest) and os.listdir(dest), "папка пуста"
 check("Изображения: извлечение из PDF (PyMuPDF)", t_pdf_images)
 
-# 10c. Опции Pandoc: оглавление + нумерация разделов в html
+# 10e. Pandoc options: table of contents + section numbering in html
 def t_pandoc_options():
     import pypandoc
     src = os.path.join(tmp, "опции.md")
     with open(src, "w", encoding="utf-8") as f:
         f.write("# Раздел один\n\nТекст.\n\n## Подраздел\n\nЕщё текст.\n")
     out = os.path.join(tmp, "опции.html")
-    # как формирует extra_args вкладка Pandoc
+    # the extra_args the Pandoc tab builds
     extra = ["--standalone", "--toc", "--number-sections", "--highlight-style=tango"]
     pypandoc.convert_file(src, "html", outputfile=out, extra_args=extra)
     html = open(out, encoding="utf-8").read()
     assert "toc" in html.lower() or "Раздел один" in html, "оглавление не сформировано"
 check("Pandoc: опции --toc/--number-sections/--highlight-style", t_pandoc_options)
 
-# 10d. Защита результата: свободное имя и сравнение путей
+# 10d. Output protection: free name and path comparison
 def t_paths():
     from docforge.core.paths import same_file, unique_path
     d = os.path.join(tmp, "конфликт")
@@ -269,12 +269,12 @@ def t_paths():
     assert unique_path(f).name == "файл-3.md", "нумерация не продолжилась"
     free = os.path.join(d, "нет-такого.md")
     assert str(unique_path(free)) == free, "свободный путь не должен меняться"
-    # сравнение путей: разное написание одного файла
+    # path comparison: two spellings of the same file
     assert same_file(f, f.replace("\\", "/")), "один файл не распознан"
     assert not same_file(f, str(u2)), "разные файлы посчитаны одинаковыми"
 check("Пути: свободное имя (-2/-3) и сравнение путей", t_paths)
 
-# 11. ffmpeg-статус (информационно)
+# 11. ffmpeg status (informational)
 def t_ffmpeg():
     from docforge.core import ffmpeg as ffmpeg_helper
     path = ffmpeg_helper.find_ffmpeg()
@@ -284,7 +284,7 @@ def t_ffmpeg():
         results.append((SKIP, "ffmpeg не установлен — аудио/видео недоступны (опционально)"))
 t_ffmpeg()
 
-# Итог
+# Summary
 print()
 fails = 0
 for status, name in results:

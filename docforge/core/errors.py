@@ -1,17 +1,17 @@
-"""Понятные пользователю формулировки типовых ошибок конвертации."""
+"""Human-readable wording for common conversion errors."""
 
 
 def friendly_error(e: Exception) -> str:
-    """Возвращает читаемое описание ошибки для строки статуса.
+    """Return a readable description of an error for the status line.
 
-    Частые случаи (нет прав, файл занят, нет места) переводятся в понятный
-    текст; остальное отдаётся как есть.
+    Common cases (no permission, file locked, disk full) get plain wording;
+    anything else is passed through as-is.
     """
     if isinstance(e, PermissionError):
         return f"нет прав на запись — возможно, файл открыт в другой программе ({e})"
     if isinstance(e, FileNotFoundError):
         return f"файл или папка не найдены ({e})"
     if isinstance(e, OSError):
-        # сюда попадают «нет места на диске», недопустимый путь и т.п.
+        # covers "no space left", invalid path and similar
         return f"ошибка файловой системы ({e})"
     return str(e)

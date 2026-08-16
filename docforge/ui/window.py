@@ -16,9 +16,9 @@ class MainWindow(QMainWindow):
     def __init__(self, log_file: Path | None = None) -> None:
         super().__init__()
         self.setWindowTitle("DocForge")
-        # фиксированный размер — одинаков на всех вкладках и не меняется при
-        # переключении настроек; лог вынесен в отдельное окно, поэтому большой
-        # области в окне нет, а растяжка в каждой вкладке прижимает поля вверх
+        # fixed size — identical on every tab and unchanged when settings are
+        # toggled; the log lives in its own window, so there is no large panel
+        # here, and each tab's trailing stretch pins its fields to the top
         self.setFixedSize(640, 430)
 
         tabs = QTabWidget()
@@ -26,7 +26,7 @@ class MainWindow(QMainWindow):
         tabs.addTab(PandocTab(), "Pandoc")
         tabs.addTab(ImagesTab(), "Изображения")
 
-        # кнопка управления компонентами — всегда видна в углу таб-бара
+        # components button — always visible in the tab-bar corner
         components_btn = QPushButton("Компоненты")
         components_btn.setToolTip("Установить или проверить ffmpeg, MiKTeX, Chromium и ядро")
         components_btn.clicked.connect(self._open_components)
@@ -50,6 +50,6 @@ class MainWindow(QMainWindow):
         folder = str(self._log_file.parent)
         log.debug("Открытие папки логов: %s", folder)
         try:
-            os.startfile(folder)  # noqa: S606 — Windows-only, путь не от пользователя
+            os.startfile(folder)  # noqa: S606 — Windows-only, path is ours, not user input
         except OSError as e:
             log.warning("Не удалось открыть папку логов: %s", e)

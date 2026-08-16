@@ -1,4 +1,4 @@
-"""Диалоги подтверждения, общие для вкладок."""
+"""Confirmation dialogs shared by the tabs."""
 import logging
 from pathlib import Path
 
@@ -11,12 +11,12 @@ log = logging.getLogger(__name__)
 
 def resolve_output_conflict(parent: QWidget, output_path: str, input_path: str,
                             *, is_dir: bool = False) -> str | None:
-    """Проверяет путь результата перед конвертацией.
+    """Validate the output path before a conversion starts.
 
-    Возвращает итоговый путь (возможно, изменённый) либо None, если
-    продолжать нельзя — пользователь отменил или путь совпал с исходным.
+    Returns the final path (possibly changed), or None when the run must not
+    proceed — the user cancelled, or the path collides with the input file.
     """
-    # 1. Результат не должен затирать исходный файл
+    # 1. The result must never clobber the source file
     if not is_dir and same_file(output_path, input_path):
         log.warning("Отказ: путь результата совпадает с исходным файлом (%s)", output_path)
         QMessageBox.critical(
@@ -29,7 +29,7 @@ def resolve_output_conflict(parent: QWidget, output_path: str, input_path: str,
     p = Path(output_path)
     if not p.exists():
         return output_path
-    # для папки предупреждаем только если в ней что-то есть
+    # for a directory, only warn when it actually holds something
     if is_dir and p.is_dir() and not any(p.iterdir()):
         return output_path
 

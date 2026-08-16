@@ -18,7 +18,7 @@ _ICON = Path(__file__).parent / "resources" / "app.ico"
 def main() -> None:
     log_file = setup_logging()
 
-    # без этого Windows показывает в панели задач иконку Python, а не приложения
+    # without this Windows shows the Python icon in the taskbar, not ours
     if sys.platform == "win32":
         import ctypes
         ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID("DocForge")
@@ -31,7 +31,7 @@ def main() -> None:
     apply_dark_theme(app)
     ensure_dependencies(app)
 
-    # настраиваем pydub, если ffmpeg уже установлен
+    # wire pydub up if ffmpeg is already installed
     from docforge.core.ffmpeg import find_ffmpeg, configure_pydub
     ffmpeg_path = find_ffmpeg()
     if ffmpeg_path:

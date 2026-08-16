@@ -12,14 +12,14 @@ log = logging.getLogger(__name__)
 
 
 def open_in_explorer(path: str) -> None:
-    """Открывает проводник: файл — выделенным, папку — как есть."""
+    """Open Explorer: a file gets selected, a folder is opened as-is."""
     p = Path(path)
     try:
         if p.is_file():
-            # выделяем файл в проводнике
+            # highlight the file in Explorer
             subprocess.run(["explorer", "/select,", str(p)])
         elif p.is_dir():
-            os.startfile(str(p))  # noqa: S606 — Windows, путь из результата конвертации
+            os.startfile(str(p))  # noqa: S606 — Windows, path comes from our own result
         else:
             os.startfile(str(p.parent))  # noqa: S606
     except OSError as e:
@@ -27,10 +27,10 @@ def open_in_explorer(path: str) -> None:
 
 
 class StatusLog(QWidget):
-    """Однострочный статус + кнопки «Папка» и «Подробнее».
+    """One-line status plus "Папка" and "Подробнее" buttons.
 
-    В окне видна только последняя строка (✓/✗/ℹ). Полный лог открывается в
-    отдельном окне; кнопка «Папка» ведёт к результату последней конвертации.
+    Only the latest line (✓/✗/ℹ) is visible in the window. The full log opens
+    in a separate window; "Папка" leads to the last conversion result.
     """
 
     def __init__(self) -> None:
@@ -76,12 +76,12 @@ class StatusLog(QWidget):
             self._view.append(text)
 
     def reset(self) -> None:
-        """Сброс перед новой конвертацией: прячем кнопку «Папка»."""
+        """Reset before a new run: hide the "Папка" button."""
         self._result = None
         self._folder_btn.hide()
 
     def set_result(self, path: str) -> None:
-        """Показывает кнопку «Папка», ведущую к результату."""
+        """Show the "Папка" button pointing at the result."""
         self._result = path
         self._folder_btn.show()
 

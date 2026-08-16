@@ -49,6 +49,7 @@ def apply_dark_theme(app: QApplication) -> None:
     p.setColor(QPalette.ColorRole.HighlightedText, QColor(255, 255, 255))
     p.setColor(QPalette.ColorRole.PlaceholderText, QColor(100, 100, 100))
 
+    # disabled widgets
     p.setColor(QPalette.ColorGroup.Disabled, QPalette.ColorRole.WindowText, QColor(90, 90, 90))
     p.setColor(QPalette.ColorGroup.Disabled, QPalette.ColorRole.Text,       QColor(90, 90, 90))
     p.setColor(QPalette.ColorGroup.Disabled, QPalette.ColorRole.ButtonText, QColor(90, 90, 90))

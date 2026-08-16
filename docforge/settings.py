@@ -1,4 +1,4 @@
-"""Персистентные настройки UI (QSettings — реестр Windows HKCU\\Software\\DocForge)."""
+"""Persistent UI settings (QSettings — Windows registry HKCU\\Software\\DocForge)."""
 from pathlib import Path
 
 from PyQt6.QtCore import QSettings
@@ -29,6 +29,6 @@ def last_dir() -> str:
 
 
 def remember_dir(path: str) -> None:
-    """Запоминает папку выбранного файла для следующего диалога «Обзор»."""
+    """Remember the folder of the chosen file for the next Browse dialog."""
     if path:
         put("paths/last_dir", str(Path(path).parent))

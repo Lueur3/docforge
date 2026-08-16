@@ -1,1 +1,1 @@
-"""Логика конвертации и работа с внешними инструментами (без UI)."""
+"""Conversion logic and external-tool handling (no UI)."""
