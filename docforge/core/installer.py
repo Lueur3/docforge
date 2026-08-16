@@ -9,6 +9,7 @@ from pathlib import Path
 from PyQt6.QtCore import QThread, pyqtSignal
 
 from docforge.core import latex
+from docforge.i18n import tr
 from docforge.proc import NO_WINDOW
 
 log = logging.getLogger(__name__)
@@ -62,7 +63,8 @@ class SetupWorker(QThread):
     def _winget(self, package_id: str) -> None:
         if shutil.which("winget") is None:
             raise RuntimeError(
-                f"winget недоступен. Установите компонент вручную (id: {package_id})."
+                tr("winget is unavailable. Install the component manually (id: {id}).")
+                .format(id=package_id)
             )
         subprocess.check_call(
             ["winget", "install", "--id", package_id, "-e", "--silent",
@@ -87,23 +89,23 @@ class SetupWorker(QThread):
         try:
             if self._core:
                 if not markitdown_installed():
-                    self.status.emit("Установка MarkItDown с pypi.org...")
+                    self.status.emit(tr("Installing MarkItDown from pypi.org..."))
                     self._pip("markitdown[all]")
-                self.status.emit("Установка pypandoc с pypi.org...")
+                self.status.emit(tr("Installing pypandoc from pypi.org..."))
                 self._pip("pypandoc")
-                self.status.emit("Установка PyMuPDF с pypi.org...")
+                self.status.emit(tr("Installing PyMuPDF from pypi.org..."))
                 self._pip("pymupdf")
                 if not pandoc_installed():
-                    self.status.emit("Загрузка Pandoc с github.com/jgm/pandoc (может занять минуту)...")
+                    self.status.emit(tr("Downloading Pandoc from github.com/jgm/pandoc (may take a minute)..."))
                     import pypandoc
                     pypandoc.download_pandoc()
 
             if self._ffmpeg:
-                self.status.emit("Установка ffmpeg (imageio-ffmpeg) с pypi.org...")
+                self.status.emit(tr("Installing ffmpeg (imageio-ffmpeg) from pypi.org..."))
                 self._pip("imageio-ffmpeg")
 
             if self._miktex:
-                self.status.emit("Установка MiKTeX через winget (может занять 5–10 минут)...")
+                self.status.emit(tr("Installing MiKTeX via winget (may take 5–10 minutes)..."))
                 self._winget("MiKTeX.MiKTeX")
                 # turn on on-the-fly LaTeX package installation, otherwise the
                 # first PDF build dies on a non-interactive package prompt
@@ -112,9 +114,9 @@ class SetupWorker(QThread):
                     latex.ensure_autoinstall(engine)
 
             if self._chromium:
-                self.status.emit("Установка Playwright с pypi.org...")
+                self.status.emit(tr("Installing Playwright from pypi.org..."))
                 self._pip("playwright")
-                self.status.emit("Загрузка Chromium (~150 МБ, может занять несколько минут)...")
+                self.status.emit(tr("Downloading Chromium (~150 MB, may take a few minutes)..."))
                 subprocess.check_call(
                     [sys.executable, "-m", "playwright", "install", "chromium"],
                     stdout=subprocess.DEVNULL,

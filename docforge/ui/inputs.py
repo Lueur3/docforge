@@ -9,6 +9,7 @@ from PyQt6.QtWidgets import (
 )
 
 from docforge import settings
+from docforge.i18n import tr
 
 
 def scan_folder(folder: str, exts: list[str], *, recursive: bool = False) -> list[str]:
@@ -25,11 +26,11 @@ def summarize(paths: list[str]) -> str:
         return paths[0]
     names = ", ".join(Path(p).name for p in paths[:3])
     tail = ", ..." if len(paths) > 3 else ""
-    return f"{len(paths)} файлов: {names}{tail}"
+    return tr("{n} files: ").format(n=len(paths)) + f"{names}{tail}"
 
 
 class InputSelector(QWidget):
-    """Field plus "Обзор" (multi-select) and "Папка" (scan a directory)."""
+    """Field plus a multi-select browse button and a folder scan button."""
 
     changed = pyqtSignal()
 
@@ -45,20 +46,20 @@ class InputSelector(QWidget):
         row.setSpacing(6)
 
         self._edit = QLineEdit()
-        self._edit.setPlaceholderText("Путь к файлу или несколько файлов...")
+        self._edit.setPlaceholderText(tr("Path to a file, or several files..."))
         self._edit.editingFinished.connect(self._on_text_edited)
 
-        btn_files = QPushButton("Обзор")
+        btn_files = QPushButton(tr("Browse"))
         btn_files.setFixedWidth(80)
-        btn_files.setToolTip(
-            "Выбрать один или несколько файлов (Ctrl+O). "
-            "Файлы также можно перетащить в окно."
-        )
+        btn_files.setToolTip(tr(
+            "Select one or more files (Ctrl+O). "
+            "Files can also be dropped onto the window."
+        ))
         btn_files.clicked.connect(self.browse_files)
 
-        btn_dir = QPushButton("Папка")
+        btn_dir = QPushButton(tr("Folder"))
         btn_dir.setFixedWidth(70)
-        btn_dir.setToolTip("Взять все поддерживаемые файлы из папки")
+        btn_dir.setToolTip(tr("Take every supported file from a folder"))
         btn_dir.clicked.connect(self.browse_folder)
 
         # a style-drawn icon, not a font glyph: "▾" renders as nothing on some systems
@@ -68,7 +69,7 @@ class InputSelector(QWidget):
         )
         self._recent_btn.setPopupMode(QToolButton.ToolButtonPopupMode.InstantPopup)
         self._recent_btn.setFixedSize(34, 26)
-        self._recent_btn.setToolTip("Недавние файлы")
+        self._recent_btn.setToolTip(tr("Recent files"))
         self._recent_menu = QMenu(self)
         self._recent_menu.aboutToShow.connect(self._fill_recent_menu)
         self._recent_btn.setMenu(self._recent_menu)
@@ -101,14 +102,14 @@ class InputSelector(QWidget):
         self._recent_menu.clear()
         entries = settings.get_recent(self._scope)
         if not entries:
-            self._recent_menu.addAction("Пока пусто").setEnabled(False)
+            self._recent_menu.addAction(tr("Nothing yet")).setEnabled(False)
             return
         for entry in entries:
             label = summarize(entry)
             if len(label) > 70:
                 label = "..." + label[-67:]
             if not all(os.path.exists(p) for p in entry):
-                label += "  (нет на диске)"
+                label += tr("  (missing)")
             action = self._recent_menu.addAction(label)
             action.setToolTip("\n".join(entry))
             action.triggered.connect(lambda _checked, e=entry: self.set_paths(e))
@@ -129,14 +130,14 @@ class InputSelector(QWidget):
 
     def browse_files(self) -> None:
         paths, _ = QFileDialog.getOpenFileNames(
-            self, "Выбрать файлы", settings.last_dir(), self._filter
+            self, tr("Select files"), settings.last_dir(), self._filter
         )
         if paths:
             self.set_paths(paths)
 
     def browse_folder(self) -> None:
         folder = QFileDialog.getExistingDirectory(
-            self, "Выбрать папку с файлами", settings.last_dir()
+            self, tr("Select a folder with files"), settings.last_dir()
         )
         if not folder:
             return

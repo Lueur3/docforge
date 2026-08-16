@@ -6,6 +6,7 @@ from PyQt6.QtWidgets import QMessageBox, QWidget
 
 from docforge.core.batch import Job
 from docforge.core.paths import same_file, unique_path
+from docforge.i18n import tr
 
 log = logging.getLogger(__name__)
 
@@ -21,9 +22,9 @@ def resolve_output_conflict(parent: QWidget, output_path: str, input_path: str,
     if not is_dir and same_file(output_path, input_path):
         log.warning("Отказ: путь результата совпадает с исходным файлом (%s)", output_path)
         QMessageBox.critical(
-            parent, "Совпадение путей",
-            "Файл результата совпадает с исходным — конвертация уничтожила бы оригинал.\n\n"
-            "Измените путь результата.",
+            parent, tr("Path conflict"),
+            tr("The result file is the same as the source — converting would destroy "
+               "the original.\n\nChange the output path."),
         )
         return None
 
@@ -34,16 +35,17 @@ def resolve_output_conflict(parent: QWidget, output_path: str, input_path: str,
     if is_dir and p.is_dir() and not any(p.iterdir()):
         return output_path
 
-    what = "Папка" if is_dir else "Файл"
+    what = tr("Folder ") if is_dir else tr("File")
     free = unique_path(output_path)
     box = QMessageBox(parent)
     box.setIcon(QMessageBox.Icon.Warning)
-    box.setWindowTitle("Результат уже существует")
-    box.setText(f"{what} уже существует:\n{output_path}")
-    box.setInformativeText(f"Сохранить рядом как «{free.name}» или перезаписать?")
-    btn_keep = box.addButton(f"Сохранить как {free.name}", QMessageBox.ButtonRole.AcceptRole)
-    btn_over = box.addButton("Перезаписать", QMessageBox.ButtonRole.DestructiveRole)
-    btn_cancel = box.addButton("Отмена", QMessageBox.ButtonRole.RejectRole)
+    box.setWindowTitle(tr("The result already exists"))
+    box.setText(tr("{what} already exists:\n{path}").format(what=what, path=output_path))
+    box.setInformativeText(tr("Save alongside as «{name}» or overwrite?").format(name=free.name))
+    btn_keep = box.addButton(tr("Save as {name}").format(name=free.name),
+                             QMessageBox.ButtonRole.AcceptRole)
+    btn_over = box.addButton(tr("Overwrite"), QMessageBox.ButtonRole.DestructiveRole)
+    btn_cancel = box.addButton(tr("Cancel"), QMessageBox.ButtonRole.RejectRole)
     box.setDefaultButton(btn_keep)
     box.exec()
 
@@ -87,8 +89,9 @@ def resolve_batch_conflicts(parent: QWidget, jobs: list[Job],
 
     if skipped_self:
         QMessageBox.warning(
-            parent, "Совпадение путей",
-            f"Пропущено файлов: {skipped_self} — результат совпал бы с исходным файлом.",
+            parent, tr("Path conflict"),
+            tr("Skipped files: {n} — the result would have replaced the source file.")
+            .format(n=skipped_self),
         )
     if not safe:
         return None
@@ -97,15 +100,14 @@ def resolve_batch_conflicts(parent: QWidget, jobs: list[Job],
     if not existing:
         return safe
 
-    what = "папок" if is_dir else "результатов"
     box = QMessageBox(parent)
     box.setIcon(QMessageBox.Icon.Warning)
-    box.setWindowTitle("Результаты уже существуют")
-    box.setText(f"Уже существует {what}: {len(existing)} из {len(safe)}.")
-    box.setInformativeText("Сохранить их рядом под свободными именами или перезаписать?")
-    btn_keep = box.addButton("Сохранить рядом", QMessageBox.ButtonRole.AcceptRole)
-    btn_over = box.addButton("Перезаписать", QMessageBox.ButtonRole.DestructiveRole)
-    btn_cancel = box.addButton("Отмена", QMessageBox.ButtonRole.RejectRole)
+    box.setWindowTitle(tr("Results already exist"))
+    box.setText(tr("Already exists: {n} of {total}.").format(n=len(existing), total=len(safe)))
+    box.setInformativeText(tr("Save them alongside under free names, or overwrite?"))
+    btn_keep = box.addButton(tr("Save alongside"), QMessageBox.ButtonRole.AcceptRole)
+    btn_over = box.addButton(tr("Overwrite"), QMessageBox.ButtonRole.DestructiveRole)
+    btn_cancel = box.addButton(tr("Cancel"), QMessageBox.ButtonRole.RejectRole)
     box.setDefaultButton(btn_keep)
     box.exec()
 

@@ -9,6 +9,7 @@ from typing import Callable
 from PyQt6.QtCore import QThread, pyqtSignal
 
 from docforge.core.errors import friendly_error
+from docforge.i18n import tr
 
 log = logging.getLogger(__name__)
 
@@ -63,7 +64,7 @@ class BatchRunner(QThread):
 
     def _guarded(self, job: Job) -> None:
         if self._cancelled:
-            raise RuntimeError("отменено пользователем")
+            raise RuntimeError(tr("cancelled by the user"))
         self._fn(job)
 
     def run(self) -> None:

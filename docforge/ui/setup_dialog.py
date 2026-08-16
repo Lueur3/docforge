@@ -7,6 +7,7 @@ from PyQt6.QtWidgets import (
 )
 
 from docforge.core import chromium, ffmpeg, latex
+from docforge.i18n import tr
 from docforge.core.installer import (
     SetupWorker, mark_setup_done, markitdown_installed, pandoc_installed, core_ready,
 )
@@ -19,7 +20,7 @@ class SetupDialog(QDialog):
         super().__init__()
         self._first_run = first_run
         self.setWindowTitle(
-            "DocForge — настройка компонентов" if first_run else "DocForge — компоненты"
+            tr("DocForge — component setup") if first_run else tr("DocForge — components")
         )
         self.setMinimumWidth(540)
 
@@ -33,8 +34,8 @@ class SetupDialog(QDialog):
         layout.setSpacing(6)
 
         intro = QLabel(
-            "DocForge использует внешние компоненты. Ниже показано, что и откуда "
-            "будет загружено. Необязательные компоненты можно отключить."
+            tr("DocForge uses external components. Below is what will be downloaded "
+               "and from where. The optional ones can be switched off.")
         )
         intro.setWordWrap(True)
         layout.addWidget(intro)
@@ -42,26 +43,26 @@ class SetupDialog(QDialog):
 
         self._chk_core = self._add_row(
             layout,
-            "MarkItDown + Pandoc — ядро конвертации",
+            tr("MarkItDown + Pandoc — the conversion core"),
             "pypi.org/project/markitdown · pypi.org/project/pypandoc · github.com/jgm/pandoc/releases",
             installed=core_ok, required=True,
         )
         self._chk_ffmpeg = self._add_row(
             layout,
-            "ffmpeg — аудио и видео во вкладке MarkItDown",
-            "pypi.org/project/imageio-ffmpeg (~30 МБ)",
+            tr("ffmpeg — audio and video in the MarkItDown tab"),
+            "pypi.org/project/imageio-ffmpeg (~30 MB)",
             installed=ffmpeg_ok, required=False,
         )
         self._chk_miktex = self._add_row(
             layout,
-            "MiKTeX — вывод в PDF во вкладке Pandoc (движок LaTeX)",
-            "winget: MiKTeX.MiKTeX, источник miktex.org (~250 МБ)",
+            tr("MiKTeX — PDF output in the Pandoc tab (LaTeX engine)"),
+            "winget: MiKTeX.MiKTeX, from miktex.org (~250 MB)",
             installed=miktex_ok, required=False,
         )
         self._chk_chromium = self._add_row(
             layout,
-            "Chromium — PDF «как браузер» во вкладке Pandoc",
-            "pypi.org/project/playwright + браузер Chromium (~150 МБ)",
+            tr("Chromium — browser-style PDF in the Pandoc tab"),
+            "pypi.org/project/playwright + Chromium browser (~150 MB)",
             installed=chromium_ok, required=False,
         )
 
@@ -77,9 +78,9 @@ class SetupDialog(QDialog):
 
         nothing_to_install = core_ok and ffmpeg_ok and miktex_ok and chromium_ok
         if nothing_to_install:
-            self._btn = QPushButton("Продолжить" if first_run else "Закрыть")
+            self._btn = QPushButton(tr("Continue") if first_run else tr("Close"))
         else:
-            self._btn = QPushButton("Установить и продолжить" if first_run else "Установить")
+            self._btn = QPushButton(tr("Install and continue") if first_run else tr("Install"))
         self._btn.setFixedHeight(34)
         self._btn.clicked.connect(self._start)
         layout.addWidget(self._btn)
@@ -90,11 +91,11 @@ class SetupDialog(QDialog):
                  installed: bool, required: bool) -> QCheckBox:
         chk = QCheckBox()
         if installed:
-            chk.setText(f"{title}  —  ✓ уже установлено")
+            chk.setText(title + tr("  —  ✓ already installed"))
             chk.setChecked(True)
             chk.setEnabled(False)
         elif required:
-            chk.setText(f"{title}  —  обязательно")
+            chk.setText(title + tr("  —  required"))
             chk.setChecked(True)
             chk.setEnabled(False)
         else:
@@ -103,7 +104,7 @@ class SetupDialog(QDialog):
         chk.setProperty("installed", installed)
         layout.addWidget(chk)
 
-        src = QLabel(f"Источник: {source}")
+        src = QLabel(tr("Source: {source}").format(source=source))
         src.setStyleSheet("color: #888; font-size: 11px; margin-left: 24px;")
         src.setWordWrap(True)
         layout.addWidget(src)
@@ -131,7 +132,7 @@ class SetupDialog(QDialog):
 
     def _on_done(self, success: bool, error: str) -> None:
         if not success:
-            QMessageBox.warning(self, "Ошибка установки", error)
+            QMessageBox.warning(self, tr("Installation error"), error)
             # only fatal when the core failed to install on the first run
             if self._first_run and not (markitdown_installed() and pandoc_installed()):
                 sys.exit(1)

@@ -8,6 +8,8 @@ from PyQt6.QtWidgets import (
     QDialog, QSizePolicy,
 )
 
+from docforge.i18n import tr
+
 log = logging.getLogger(__name__)
 
 
@@ -27,10 +29,10 @@ def open_in_explorer(path: str) -> None:
 
 
 class StatusLog(QWidget):
-    """One-line status plus "Папка" and "Подробнее" buttons.
+    """One-line status plus a result-folder button and a details button.
 
     Only the latest line (✓/✗/ℹ) is visible in the window. The full log opens
-    in a separate window; "Папка" leads to the last conversion result.
+    in a separate window; the folder button leads to the last result.
     """
 
     def __init__(self) -> None:
@@ -43,15 +45,15 @@ class StatusLog(QWidget):
         self._status.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Preferred)
         self._status.setStyleSheet("color: #888; font-size: 11px;")
 
-        self._folder_btn = QPushButton("Папка")
+        self._folder_btn = QPushButton(tr("Folder"))
         self._folder_btn.setFixedWidth(70)
-        self._folder_btn.setToolTip("Открыть папку с результатом")
+        self._folder_btn.setToolTip(tr("Open the result folder"))
         self._folder_btn.clicked.connect(self._open_result)
         self._folder_btn.hide()
 
-        self._btn = QPushButton("Подробнее")
+        self._btn = QPushButton(tr("Details"))
         self._btn.setFixedWidth(90)
-        self._btn.setToolTip("Открыть полный лог конвертации")
+        self._btn.setToolTip(tr("Open the full conversion log"))
         self._btn.clicked.connect(self._show_details)
 
         row.addWidget(self._status, 1)
@@ -78,15 +80,15 @@ class StatusLog(QWidget):
     def set_progress(self, done: int, total: int, name: str) -> None:
         """Show batch progress in the status line without growing the log."""
         self._status.setStyleSheet("color: #aaa; font-size: 11px;")
-        self._status.setText(f"▶ {done} из {total}: {name}")
+        self._status.setText(tr("▶ {done} of {total}: {name}").format(done=done, total=total, name=name))
 
     def reset(self) -> None:
-        """Reset before a new run: hide the "Папка" button."""
+        """Reset before a new run: hide the result-folder button."""
         self._result = None
         self._folder_btn.hide()
 
     def set_result(self, path: str) -> None:
-        """Show the "Папка" button pointing at the result."""
+        """Show the result-folder button pointing at the result."""
         self._result = path
         self._folder_btn.show()
 
@@ -97,7 +99,7 @@ class StatusLog(QWidget):
     def _show_details(self) -> None:
         if self._dialog is None:
             self._dialog = QDialog(self)
-            self._dialog.setWindowTitle("DocForge — лог конвертации")
+            self._dialog.setWindowTitle(tr("DocForge — conversion log"))
             self._dialog.resize(560, 360)
             lay = QVBoxLayout(self._dialog)
             self._view = QTextEdit()

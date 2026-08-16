@@ -3,6 +3,7 @@ import logging
 from dataclasses import asdict, dataclass, fields
 
 from docforge import settings
+from docforge.i18n import tr
 
 log = logging.getLogger(__name__)
 
@@ -31,13 +32,13 @@ class Preset:
 
 # Shipped with the app; these cannot be overwritten or deleted
 BUILTIN: dict[str, Preset] = {
-    "Для печати — PDF, поля 2 см": Preset(
+    "Print-ready — PDF, 2 cm margins": Preset(
         format="pdf", engine="chromium", margin="2cm"
     ),
-    "Документ Word — с оглавлением": Preset(
+    "Word document — with a table of contents": Preset(
         format="docx", toc=True, number_sections=True
     ),
-    "Для LLM — Markdown": Preset(format="md"),
+    "For an LLM — Markdown": Preset(format="md"),
 }
 
 
@@ -68,9 +69,9 @@ def save(name: str, preset: Preset) -> None:
     """Store a user preset. Built-in names are refused."""
     name = name.strip()
     if not name:
-        raise ValueError("Имя пресета не может быть пустым")
+        raise ValueError(tr("A preset name cannot be empty"))
     if is_builtin(name):
-        raise ValueError(f"«{name}» — встроенный пресет, выберите другое имя")
+        raise ValueError(tr("«{name}» is a built-in preset, choose another name").format(name=name))
     data = {n: p.to_dict() for n, p in user_presets().items()}
     data[name] = preset.to_dict()
     settings.put_json(_KEY, data)
@@ -80,7 +81,7 @@ def save(name: str, preset: Preset) -> None:
 def delete(name: str) -> None:
     """Remove a user preset. Built-ins are refused."""
     if is_builtin(name):
-        raise ValueError(f"«{name}» — встроенный пресет, его нельзя удалить")
+        raise ValueError(tr("«{name}» is a built-in preset and cannot be deleted").format(name=name))
     data = {n: p.to_dict() for n, p in user_presets().items() if n != name}
     settings.put_json(_KEY, data)
     log.info("Пресет удалён: %s", name)

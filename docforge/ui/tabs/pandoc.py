@@ -16,6 +16,7 @@ from docforge.core.pandoc import FORMATS, HIGHLIGHT_STYLES, PandocOptions
 from docforge.ui import file_filters
 from docforge.ui.dialogs import resolve_batch_conflicts
 from docforge.ui.inputs import InputSelector
+from docforge.i18n import tr
 from docforge.ui.widgets import StatusLog
 
 log = logging.getLogger(__name__)
@@ -38,37 +39,37 @@ class PandocTab(QWidget):
         layout.setContentsMargins(16, 16, 16, 16)
 
         # Input files
-        layout.addWidget(QLabel("Входные файлы:"))
+        layout.addWidget(QLabel(tr("Input files:")))
         self._inputs = InputSelector(
-            file_filters.PANDOC_INPUT, file_filters.PANDOC_EXTS, "pandoc"
+            file_filters.pandoc_filter(), file_filters.PANDOC_EXTS, "pandoc"
         )
         self._inputs.changed.connect(self._on_inputs_changed)
         layout.addWidget(self._inputs)
 
         # Output format
-        layout.addWidget(QLabel("Формат вывода:"))
+        layout.addWidget(QLabel(tr("Output format:")))
         self._fmt_combo = QComboBox()
         for label, _writer, ext, _standalone in FORMATS:
-            self._fmt_combo.addItem(f"{label}  (.{ext})", ext)
+            self._fmt_combo.addItem(f"{tr(label)}  (.{ext})", ext)
         self._fmt_combo.currentIndexChanged.connect(self._on_format_changed)
         layout.addWidget(self._fmt_combo)
 
         # Output: a file for one input, a folder for several
-        self._output_label = QLabel("Выходной файл:")
+        self._output_label = QLabel(tr("Output file:"))
         layout.addWidget(self._output_label)
         row_out = QHBoxLayout()
         self._output_edit = QLineEdit()
-        self._output_edit.setPlaceholderText("Путь к файлу результата...")
-        self._output_btn = QPushButton("Обзор")
+        self._output_edit.setPlaceholderText(tr("Path to the result file..."))
+        self._output_btn = QPushButton(tr("Browse"))
         self._output_btn.setFixedWidth(80)
-        self._output_btn.setToolTip("Куда сохранить результат")
+        self._output_btn.setToolTip(tr("Where to save the result"))
         self._output_btn.clicked.connect(self._browse_output)
         row_out.addWidget(self._output_edit)
         row_out.addWidget(self._output_btn)
         layout.addLayout(row_out)
 
         # Settings (collapsed by default)
-        self._settings_btn = QPushButton("Настройки ▸")
+        self._settings_btn = QPushButton(tr("Settings ▸"))
         self._settings_btn.setCheckable(True)
         self._settings_btn.setFixedHeight(24)
         self._settings_btn.clicked.connect(self._toggle_settings)
@@ -79,7 +80,7 @@ class PandocTab(QWidget):
         layout.addWidget(self._settings_box)
 
         # Convert button (turns into Cancel while a batch is running)
-        self._convert_btn = QPushButton("Конвертировать")
+        self._convert_btn = QPushButton(tr("Convert"))
         self._convert_btn.setObjectName("btn_convert")
         self._convert_btn.setFixedHeight(36)
         self._convert_btn.clicked.connect(self._on_button)
@@ -108,18 +109,18 @@ class PandocTab(QWidget):
         # Presets: named sets of the settings below
         preset_row = QHBoxLayout()
         preset_row.setSpacing(6)
-        preset_row.addWidget(QLabel("Пресет:"))
+        preset_row.addWidget(QLabel(tr("Preset:")))
         self._preset_combo = QComboBox()
-        self._preset_combo.setToolTip("Готовый набор настроек — применяется при выборе")
+        self._preset_combo.setToolTip(tr("A ready-made set of settings — applied on selection"))
         self._preset_combo.currentIndexChanged.connect(self._on_preset_selected)
         preset_row.addWidget(self._preset_combo, 1)
-        save_btn = QPushButton("Сохранить")
+        save_btn = QPushButton(tr("Save"))
         save_btn.setFixedWidth(90)
-        save_btn.setToolTip("Сохранить текущие настройки как пресет")
+        save_btn.setToolTip(tr("Save the current settings as a preset"))
         save_btn.clicked.connect(self._save_preset)
-        del_btn = QPushButton("Удалить")
+        del_btn = QPushButton(tr("Delete"))
         del_btn.setFixedWidth(80)
-        del_btn.setToolTip("Удалить выбранный пресет (встроенные удалить нельзя)")
+        del_btn.setToolTip(tr("Delete the selected preset (built-in ones cannot be removed)"))
         del_btn.clicked.connect(self._delete_preset)
         preset_row.addWidget(save_btn)
         preset_row.addWidget(del_btn)
@@ -128,18 +129,18 @@ class PandocTab(QWidget):
         # Pandoc options
         opt_row = QHBoxLayout()
         opt_row.setSpacing(12)
-        self._toc_chk = QCheckBox("Оглавление")
+        self._toc_chk = QCheckBox(tr("Table of contents"))
         self._toc_chk.setChecked(settings.get_bool("pandoc/toc", False))
         self._toc_chk.toggled.connect(lambda v: settings.put("pandoc/toc", v))
-        self._numsec_chk = QCheckBox("Нумерация разделов")
+        self._numsec_chk = QCheckBox(tr("Number sections"))
         self._numsec_chk.setChecked(settings.get_bool("pandoc/numsec", False))
         self._numsec_chk.toggled.connect(lambda v: settings.put("pandoc/numsec", v))
         opt_row.addWidget(self._toc_chk)
         opt_row.addWidget(self._numsec_chk)
-        opt_row.addWidget(QLabel("Подсветка кода:"))
+        opt_row.addWidget(QLabel(tr("Code highlighting:")))
         self._highlight_combo = QComboBox()
         for label, _value in HIGHLIGHT_STYLES:
-            self._highlight_combo.addItem(label)
+            self._highlight_combo.addItem(tr(label))
         self._highlight_combo.setCurrentIndex(settings.get_int("pandoc/highlight", 0))
         self._highlight_combo.currentIndexChanged.connect(
             lambda i: settings.put("pandoc/highlight", i)
@@ -151,11 +152,11 @@ class PandocTab(QWidget):
         # PDF parameters (enabled only when the output format is PDF)
         pdf_row = QHBoxLayout()
         pdf_row.setSpacing(8)
-        pdf_row.addWidget(QLabel("PDF — движок:"))
+        pdf_row.addWidget(QLabel(tr("PDF — engine:")))
         self._engine_combo = QComboBox()
         # Chromium first — the default PDF engine
-        self._engine_combo.addItem("Chromium (как браузер)", "chromium")
-        self._engine_combo.addItem("xelatex (LaTeX)", "latex")
+        self._engine_combo.addItem(tr("Chromium (browser-style)"), "chromium")
+        self._engine_combo.addItem(tr("xelatex (LaTeX)"), "latex")
         idx = self._engine_combo.findData(settings.get_str("pandoc/engine", "chromium"))
         if idx >= 0:
             self._engine_combo.setCurrentIndex(idx)
@@ -163,11 +164,11 @@ class PandocTab(QWidget):
             lambda: settings.put("pandoc/engine", self._engine_combo.currentData())
         )
         pdf_row.addWidget(self._engine_combo)
-        pdf_row.addWidget(QLabel("поля:"))
+        pdf_row.addWidget(QLabel(tr("margins:")))
         self._margin_edit = QLineEdit(settings.get_str("pandoc/margin", "2cm"))
         self._margin_edit.setFixedWidth(70)
         self._margin_edit.setToolTip(
-            "Например: 2cm, 1.5cm, 1in, 20mm. Пусто — поля движка по умолчанию."
+            tr("For example: 2cm, 1.5cm, 1in, 20mm. Empty — the engine's own margins.")
         )
         self._margin_edit.editingFinished.connect(
             lambda: settings.put("pandoc/margin", self._margin_edit.text().strip())
@@ -185,9 +186,9 @@ class PandocTab(QWidget):
         """Refill the preset list; `select` picks an entry afterwards."""
         self._applying_preset = True
         self._preset_combo.clear()
-        self._preset_combo.addItem("— не выбран —", "")
+        self._preset_combo.addItem(tr("— none —"), "")
         for name in presets.all_presets():
-            self._preset_combo.addItem(name, name)
+            self._preset_combo.addItem(tr(name), name)
         if select:
             idx = self._preset_combo.findData(select)
             if idx >= 0:
@@ -235,13 +236,13 @@ class PandocTab(QWidget):
         suggested = self._preset_combo.currentData() or ""
         if presets.is_builtin(suggested):
             suggested = ""
-        name, ok = QInputDialog.getText(self, "Сохранить пресет", "Название:", text=suggested)
+        name, ok = QInputDialog.getText(self, tr("Save preset"), tr("Name:"), text=suggested)
         if not ok:
             return
         try:
             presets.save(name, self._current_preset())
         except ValueError as e:
-            QMessageBox.warning(self, "Пресет не сохранён", str(e))
+            QMessageBox.warning(self, tr("Preset not saved"), str(e))
             return
         self._reload_presets(select=name.strip())
 
@@ -252,13 +253,13 @@ class PandocTab(QWidget):
         try:
             presets.delete(name)
         except ValueError as e:
-            QMessageBox.warning(self, "Пресет не удалён", str(e))
+            QMessageBox.warning(self, tr("Preset not deleted"), str(e))
             return
         self._reload_presets()
 
     def _toggle_settings(self, checked: bool) -> None:
         self._settings_box.setVisible(checked)
-        self._settings_btn.setText("Настройки ▾" if checked else "Настройки ▸")
+        self._settings_btn.setText(tr("Settings ▾") if checked else tr("Settings ▸"))
 
     def _update_pdf_controls(self) -> None:
         """Engine and margins are only enabled for the PDF format."""
@@ -298,12 +299,12 @@ class PandocTab(QWidget):
         if not paths:
             return
         if self._batch():
-            self._output_label.setText("Папка результата:")
-            self._output_btn.setToolTip("Папка, куда сложить готовые файлы")
+            self._output_label.setText(tr("Output folder:"))
+            self._output_btn.setToolTip(tr("Folder for the finished files"))
             self._output_edit.setText(str(Path(paths[0]).parent))
         else:
-            self._output_label.setText("Выходной файл:")
-            self._output_btn.setToolTip("Куда сохранить результат")
+            self._output_label.setText(tr("Output file:"))
+            self._output_btn.setToolTip(tr("Where to save the result"))
             self._output_edit.setText(str(Path(paths[0]).with_suffix(f".{self._current_ext()}")))
 
     def _on_format_changed(self) -> None:
@@ -327,7 +328,7 @@ class PandocTab(QWidget):
     def _browse_output(self) -> None:
         if self._batch():
             folder = QFileDialog.getExistingDirectory(
-                self, "Папка для результатов", self._output_edit.text() or settings.last_dir()
+                self, tr("Folder for results"), self._output_edit.text() or settings.last_dir()
             )
             if folder:
                 self._output_edit.setText(folder)
@@ -335,7 +336,7 @@ class PandocTab(QWidget):
         ext = self._current_ext()
         initial = self._output_edit.text() or str(Path.home())
         path, _ = QFileDialog.getSaveFileName(
-            self, "Сохранить как", initial, f"{ext.upper()} (*.{ext})"
+            self, tr("Save as"), initial, f"{ext.upper()} (*.{ext})"
         )
         if path:
             self._output_edit.setText(path)
@@ -346,14 +347,14 @@ class PandocTab(QWidget):
         inputs = [p for p in self._inputs.paths() if os.path.isfile(p)]
         missing = self._inputs.count() - len(inputs)
         if missing:
-            self._log.append(f"ℹ Пропущено несуществующих файлов: {missing}")
+            self._log.append(tr("ℹ Skipped missing files: {n}").format(n=missing))
         if not inputs:
-            self._log.append("Укажите входной файл.")
+            self._log.append(tr("Select an input file."))
             return None
 
         target = self._output_edit.text().strip()
         if not target:
-            self._log.append("Укажите, куда сохранить результат.")
+            self._log.append(tr("Specify where to save the result."))
             return None
 
         if len(inputs) == 1 and not self._batch():
@@ -366,7 +367,7 @@ class PandocTab(QWidget):
         if self._runner is not None and self._runner.isRunning():
             self._runner.cancel()
             self._convert_btn.setEnabled(False)
-            self._log.append("ℹ Отмена — ждём завершения текущих файлов...")
+            self._log.append(tr("ℹ Cancelling — waiting for the files in progress..."))
             return
         self._start()
 
@@ -378,24 +379,26 @@ class PandocTab(QWidget):
             return
         jobs = resolve_batch_conflicts(self, jobs)
         if not jobs:
-            self._log.append("ℹ Конвертация отменена.")
+            self._log.append(tr("ℹ Conversion cancelled."))
             return
 
         out_dir = Path(jobs[0].output_path).parent
         try:
             out_dir.mkdir(parents=True, exist_ok=True)
         except OSError as e:
-            self._log.append(f"✗ Не удалось создать папку результата: {e}")
+            self._log.append(tr("✗ Could not create the output folder: {e}").format(e=e))
             return
 
         opts = self._options()
         self._last_result = jobs[0].output_path if len(jobs) == 1 else str(out_dir)
         self._log.reset()
+        ext = self._current_ext()
         self._log.append(
-            f"▶ Конвертация в .{self._current_ext()}: {jobs[0].name}" if len(jobs) == 1
-            else f"▶ Пакетная конвертация в .{self._current_ext()}: {len(jobs)} файлов"
+            tr("▶ Converting to .{ext}: {name}").format(ext=ext, name=jobs[0].name)
+            if len(jobs) == 1
+            else tr("▶ Batch conversion to .{ext}: {n} files").format(ext=ext, n=len(jobs))
         )
-        self._convert_btn.setText("Отмена")
+        self._convert_btn.setText(tr("Cancel"))
 
         # one message channel for all jobs — engine notes go to the details log
         say = self._log.append if len(jobs) == 1 else (lambda _m: None)
@@ -410,15 +413,15 @@ class PandocTab(QWidget):
         self._runner.start()
 
     def _on_completed(self, ok: int, failed: int) -> None:
-        self._convert_btn.setText("Конвертировать")
+        self._convert_btn.setText(tr("Convert"))
         self._convert_btn.setEnabled(True)
         if failed and ok:
-            self._log.append(f"✓ Готово: {ok}, с ошибкой: {failed}")
+            self._log.append(tr("✓ Done: {ok}, failed: {failed}").format(ok=ok, failed=failed))
         elif failed:
-            self._log.append(f"✗ Не удалось конвертировать файлов: {failed}")
+            self._log.append(tr("✗ Could not convert files: {failed}").format(failed=failed))
         elif ok == 1:
-            self._log.append(f"✓ Готово → {self._last_result}")
+            self._log.append(tr("✓ Done → {path}").format(path=self._last_result))
         else:
-            self._log.append(f"✓ Готово: {ok} файлов → {self._last_result}")
+            self._log.append(tr("✓ Done: {ok} files → {path}").format(ok=ok, path=self._last_result))
         if ok:
             self._log.set_result(self._last_result)

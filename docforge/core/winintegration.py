@@ -8,12 +8,19 @@ import subprocess
 import sys
 from pathlib import Path
 
+from docforge.i18n import tr
 from docforge.proc import NO_WINDOW
 
 log = logging.getLogger(__name__)
 
 VERB = "DocForge"
-VERB_LABEL = "Конвертировать через DocForge"
+
+
+def verb_label() -> str:
+    """Menu caption shown by Explorer (in the current UI language)."""
+    return tr("Convert with DocForge")
+
+
 SENDTO_NAME = "DocForge.lnk"
 
 # Where the verb is registered for one extension
@@ -63,7 +70,7 @@ def install_context_menu(exts: list[str]) -> None:
     for ext in exts:
         key = _SHELL_KEY.format(ext=ext, verb=VERB)
         with winreg.CreateKey(winreg.HKEY_CURRENT_USER, key) as k:
-            winreg.SetValueEx(k, None, 0, winreg.REG_SZ, VERB_LABEL)
+            winreg.SetValueEx(k, None, 0, winreg.REG_SZ, verb_label())
             if os.path.isfile(icon):
                 winreg.SetValueEx(k, "Icon", 0, winreg.REG_SZ, icon)
             # ask Explorer to invoke us once with the whole selection

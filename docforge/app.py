@@ -6,6 +6,7 @@ from pathlib import Path
 from PyQt6.QtWidgets import QApplication
 from PyQt6.QtGui import QIcon
 
+from docforge import i18n
 from docforge.logging_setup import setup_logging
 from docforge.theme import apply_dark_theme
 from docforge.ui.setup_dialog import ensure_dependencies
@@ -26,6 +27,8 @@ def main() -> None:
 
     app = QApplication(sys.argv)
     app.setApplicationName("DocForge")
+    # language must be known before any widget takes its text
+    i18n.load_language()
     if _ICON.is_file():
         app.setWindowIcon(QIcon(str(_ICON)))
 

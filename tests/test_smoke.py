@@ -462,6 +462,59 @@ def t_presets_and_recent():
         S._s = original
 check("Пресеты и список недавних файлов", t_presets_and_recent)
 
+# 10m. Every tr("...") literal in the source has a Russian translation
+def t_translations():
+    import ast
+    from docforge import i18n
+
+    root = os.path.join(_ROOT, "docforge")
+    used: dict[str, str] = {}
+    for dirpath, _dirs, files in os.walk(root):
+        if "__pycache__" in dirpath:
+            continue
+        for fname in files:
+            if not fname.endswith(".py") or fname == "i18n.py":
+                continue
+            path = os.path.join(dirpath, fname)
+            tree = ast.parse(open(path, encoding="utf-8").read())
+            for node in ast.walk(tree):
+                if (isinstance(node, ast.Call) and isinstance(node.func, ast.Name)
+                        and node.func.id == "tr" and node.args
+                        and isinstance(node.args[0], ast.Constant)
+                        and isinstance(node.args[0].value, str)):
+                    used[node.args[0].value] = os.path.relpath(path, _ROOT)
+
+    assert len(used) > 80, f"найдено подозрительно мало строк: {len(used)}"
+    missing = {text: where for text, where in used.items() if text not in i18n.RU}
+    assert not missing, "без перевода: " + "; ".join(
+        f"{where}: {text[:40]!r}" for text, where in list(missing.items())[:8]
+    )
+    empty = [k for k, v in i18n.RU.items() if not v.strip()]
+    assert not empty, f"пустые переводы: {empty[:5]}"
+check("Переводы: каждая строка tr() есть в словаре", t_translations)
+
+# 10n. Both languages build the whole UI
+def t_both_languages():
+    from docforge import i18n
+    qt_app()
+    from docforge.ui.window import MainWindow
+
+    before = i18n.current()
+    try:
+        seen = {}
+        for code in ("ru", "en"):
+            i18n.set_language(code)
+            w = MainWindow()
+            tabs = w.centralWidget()
+            seen[code] = tabs.widget(1)._convert_btn.text()
+            assert tabs.count() == 3, "не все вкладки построились"
+            w.close()
+        assert seen["ru"] != seen["en"], f"язык не переключился: {seen}"
+        assert seen["en"] == "Convert", seen["en"]
+    finally:
+        i18n.set_language(before)
+check("Интерфейс собирается на обоих языках", t_both_languages)
+
 # 11. ffmpeg status (informational)
 def t_ffmpeg():
     from docforge.core import ffmpeg as ffmpeg_helper

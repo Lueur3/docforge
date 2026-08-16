@@ -6,6 +6,7 @@ from PyQt6.QtWidgets import (
 )
 
 from docforge.core import winintegration as wi
+from docforge.i18n import tr
 from docforge.ui import file_filters
 
 log = logging.getLogger(__name__)
@@ -20,7 +21,7 @@ MENU_EXTS = sorted(
 class IntegrationDialog(QDialog):
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
-        self.setWindowTitle("DocForge — интеграция с Windows")
+        self.setWindowTitle(tr("DocForge — Windows integration"))
         self.setMinimumWidth(520)
 
         layout = QVBoxLayout(self)
@@ -28,28 +29,27 @@ class IntegrationDialog(QDialog):
         layout.setSpacing(8)
 
         intro = QLabel(
-            "Необязательные ярлыки в Проводнике. Записи создаются только для текущего "
-            "пользователя (HKCU), права администратора не нужны — снимите галочку, "
-            "чтобы удалить."
+            tr("Optional Explorer shortcuts. Entries are created for the current user "
+               "only (HKCU), no administrator rights needed — untick to remove them.")
         )
         intro.setWordWrap(True)
         layout.addWidget(intro)
         layout.addSpacing(6)
 
-        self._menu_chk = QCheckBox(f"Пункт «{wi.VERB_LABEL}» в контекстном меню")
+        self._menu_chk = QCheckBox(tr("«{label}» entry in the context menu").format(label=wi.verb_label()))
         self._menu_chk.setChecked(self._menu_state())
         layout.addWidget(self._menu_chk)
         layout.addWidget(self._hint(
-            f"Правый клик по файлу → пункт открывает DocForge с этим файлом. "
-            f"Поддерживаемых расширений: {len(MENU_EXTS)}."
+            tr("Right-click a file → the entry opens DocForge with it. "
+               "Supported extensions: {n}.").format(n=len(MENU_EXTS))
         ))
 
-        self._sendto_chk = QCheckBox("Ярлык DocForge в меню «Отправить»")
+        self._sendto_chk = QCheckBox(tr("DocForge shortcut in the SendTo menu"))
         self._sendto_chk.setChecked(wi.sendto_installed())
         layout.addWidget(self._sendto_chk)
         layout.addWidget(self._hint(
-            "Правый клик → «Отправить» → DocForge. Для нескольких файлов сразу это "
-            "удобнее: они открываются в одном окне одним списком."
+            tr("Right-click → Send to → DocForge. Handier for several files at once: "
+               "they open in one window as a single list.")
         ))
 
         layout.addSpacing(8)
@@ -57,7 +57,7 @@ class IntegrationDialog(QDialog):
         self._status.setWordWrap(True)
         layout.addWidget(self._status)
 
-        apply_btn = QPushButton("Применить")
+        apply_btn = QPushButton(tr("Apply"))
         apply_btn.setFixedHeight(32)
         apply_btn.clicked.connect(self._apply)
         layout.addWidget(apply_btn)
@@ -80,29 +80,29 @@ class IntegrationDialog(QDialog):
             if want_menu != self._menu_state():
                 if want_menu:
                     wi.install_context_menu(MENU_EXTS)
-                    changes.append("пункт контекстного меню добавлен")
+                    changes.append(tr("context-menu entry added"))
                 else:
                     wi.uninstall_context_menu(MENU_EXTS)
-                    changes.append("пункт контекстного меню удалён")
+                    changes.append(tr("context-menu entry removed"))
 
             want_sendto = self._sendto_chk.isChecked()
             if want_sendto != wi.sendto_installed():
                 if want_sendto:
                     wi.install_sendto()
-                    changes.append("ярлык «Отправить» создан")
+                    changes.append(tr("SendTo shortcut created"))
                 else:
                     wi.uninstall_sendto()
-                    changes.append("ярлык «Отправить» удалён")
+                    changes.append(tr("SendTo shortcut removed"))
         except Exception as e:
             log.exception("Интеграция: не удалось применить настройки")
-            QMessageBox.warning(self, "Ошибка интеграции", str(e))
+            QMessageBox.warning(self, tr("Integration error"), str(e))
             return
 
         if changes:
             self._status.setText("✓ " + ", ".join(changes))
             self._status.setStyleSheet("color: #5cb85c; font-size: 11px;")
         else:
-            self._status.setText("Изменений нет.")
+            self._status.setText(tr("No changes."))
             self._status.setStyleSheet("color: #888; font-size: 11px;")
 
 

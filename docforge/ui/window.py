@@ -3,9 +3,12 @@ import os
 from pathlib import Path
 
 from PyQt6.QtWidgets import (
-    QHBoxLayout, QLabel, QMainWindow, QPushButton, QTabWidget, QWidget,
+    QComboBox, QHBoxLayout, QLabel, QMainWindow, QMessageBox, QPushButton,
+    QTabWidget, QWidget,
 )
 
+from docforge import i18n, settings
+from docforge.i18n import tr
 from docforge.ui import file_filters
 from docforge.ui.integration_dialog import open_integration_dialog
 from docforge.ui.setup_dialog import open_components_dialog
@@ -28,18 +31,11 @@ class MainWindow(QMainWindow):
         self._tabs = QTabWidget()
         self._tabs.addTab(MarkItDownTab(), "MarkItDown")
         self._tabs.addTab(PandocTab(), "Pandoc")
-        self._tabs.addTab(ImagesTab(), "Изображения")
+        self._tabs.addTab(ImagesTab(), tr("Images"))
         self._tabs.setCornerWidget(self._build_corner())
 
         self.setCentralWidget(self._tabs)
-
-        if log_file is not None:
-            self._log_file = Path(log_file)
-            link = QLabel(f'Лог: <a href="#">{self._log_file}</a>')
-            link.setStyleSheet("color: #888; font-size: 11px;")
-            link.setToolTip("Открыть папку с логами")
-            link.linkActivated.connect(self._open_log_dir)
-            self.statusBar().addWidget(link)
+        self._build_status_bar(log_file)
         log.debug("MainWindow создан")
 
     def _build_corner(self) -> QWidget:
@@ -49,17 +45,51 @@ class MainWindow(QMainWindow):
         row.setContentsMargins(0, 0, 4, 0)
         row.setSpacing(4)
 
-        components_btn = QPushButton("Компоненты")
-        components_btn.setToolTip("Установить или проверить ffmpeg, MiKTeX, Chromium и ядро")
+        components_btn = QPushButton(tr("Components"))
+        components_btn.setToolTip(tr("Install or check ffmpeg, MiKTeX, Chromium and the core"))
         components_btn.clicked.connect(lambda: open_components_dialog())
 
-        integration_btn = QPushButton("Интеграция")
-        integration_btn.setToolTip("Пункт в контекстном меню Проводника и ярлык «Отправить»")
+        integration_btn = QPushButton(tr("Integration"))
+        integration_btn.setToolTip(tr("Explorer context-menu entry and a SendTo shortcut"))
         integration_btn.clicked.connect(lambda: open_integration_dialog(self))
 
         row.addWidget(components_btn)
         row.addWidget(integration_btn)
         return corner
+
+    def _build_status_bar(self, log_file: Path | None) -> None:
+        if log_file is not None:
+            self._log_file = Path(log_file)
+            link = QLabel(f'{tr("Log: ")}<a href="#">{self._log_file.name}</a>')
+            link.setStyleSheet("color: #888; font-size: 11px;")
+            link.setToolTip(str(self._log_file))
+            link.linkActivated.connect(self._open_log_dir)
+            self.statusBar().addWidget(link)
+
+        lang_label = QLabel(tr("Interface language"))
+        lang_label.setStyleSheet("color: #888; font-size: 11px;")
+        self._lang_combo = QComboBox()
+        for code, title in i18n.LANGUAGES.items():
+            self._lang_combo.addItem(title, code)
+        idx = self._lang_combo.findData(i18n.current())
+        if idx >= 0:
+            self._lang_combo.setCurrentIndex(idx)
+        self._lang_combo.currentIndexChanged.connect(self._on_language_changed)
+        self.statusBar().addPermanentWidget(lang_label)
+        self.statusBar().addPermanentWidget(self._lang_combo)
+
+    def _on_language_changed(self) -> None:
+        code = self._lang_combo.currentData()
+        if code == i18n.current():
+            return
+        settings.put("ui/language", code)
+        i18n.set_language(code)
+        # widgets take their text at build time, so a restart is the honest
+        # way to apply it everywhere (dialogs, tab titles, tooltips)
+        QMessageBox.information(
+            self, tr("Language changed"),
+            tr("The interface language has been changed. Restart DocForge to apply it."),
+        )
 
     def load_files(self, paths: list[str]) -> None:
         """Preselect files handed over by Explorer, on the most fitting tab."""

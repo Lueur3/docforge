@@ -1,6 +1,5 @@
 """Supported input extensions — one source of truth for dialogs and folder scans."""
-
-_ALL = "Все файлы (*)"
+from docforge.i18n import tr
 
 # MarkItDown: documents, spreadsheets, web, images, archives, audio
 MARKITDOWN_EXTS = [
@@ -21,9 +20,18 @@ IMAGES_EXTS = ["docx", "pptx", "xlsx", "pdf", "odt", "epub", "html", "htm"]
 
 def _filter(title: str, exts: list[str]) -> str:
     mask = " ".join(f"*.{e}" for e in exts)
-    return f"{title} ({mask});;{_ALL}"
+    return f"{title} ({mask});;" + tr("All files") + " (*)"
 
 
-MARKITDOWN_INPUT = _filter("Поддерживаемые файлы", MARKITDOWN_EXTS)
-PANDOC_INPUT = _filter("Поддерживаемые файлы", PANDOC_EXTS)
-IMAGES_INPUT = _filter("Файлы с изображениями", IMAGES_EXTS)
+# Built on demand, not at import time: the UI language is only known after
+# the settings have been read.
+def markitdown_filter() -> str:
+    return _filter(tr("Supported files"), MARKITDOWN_EXTS)
+
+
+def pandoc_filter() -> str:
+    return _filter(tr("Supported files"), PANDOC_EXTS)
+
+
+def images_filter() -> str:
+    return _filter(tr("Files with images"), IMAGES_EXTS)

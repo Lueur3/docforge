@@ -1,4 +1,5 @@
 """Human-readable wording for common conversion errors."""
+from docforge.i18n import tr
 
 
 def friendly_error(e: Exception) -> str:
@@ -8,10 +9,10 @@ def friendly_error(e: Exception) -> str:
     anything else is passed through as-is.
     """
     if isinstance(e, PermissionError):
-        return f"нет прав на запись — возможно, файл открыт в другой программе ({e})"
+        return tr("no write permission — the file may be open in another program ({e})").format(e=e)
     if isinstance(e, FileNotFoundError):
-        return f"файл или папка не найдены ({e})"
+        return tr("file or folder not found ({e})").format(e=e)
     if isinstance(e, OSError):
         # covers "no space left", invalid path and similar
-        return f"ошибка файловой системы ({e})"
+        return tr("file system error ({e})").format(e=e)
     return str(e)

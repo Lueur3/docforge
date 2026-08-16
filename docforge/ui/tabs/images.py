@@ -14,6 +14,7 @@ from docforge.core.batch import BatchRunner, Job, pool_size
 from docforge.ui import file_filters
 from docforge.ui.dialogs import resolve_batch_conflicts
 from docforge.ui.inputs import InputSelector
+from docforge.i18n import tr
 from docforge.ui.widgets import StatusLog
 
 log = logging.getLogger(__name__)
@@ -35,32 +36,32 @@ class ImagesTab(QWidget):
         layout.setSpacing(8)
         layout.setContentsMargins(16, 16, 16, 16)
 
-        layout.addWidget(QLabel("Извлечение изображений из файлов (docx, pptx, pdf, epub и др.)"))
+        layout.addWidget(QLabel(tr("Extracting images from files (docx, pptx, pdf, epub and others)")))
 
         # Input files
-        layout.addWidget(QLabel("Входные файлы:"))
+        layout.addWidget(QLabel(tr("Input files:")))
         self._inputs = InputSelector(
-            file_filters.IMAGES_INPUT, file_filters.IMAGES_EXTS, "images"
+            file_filters.images_filter(), file_filters.IMAGES_EXTS, "images"
         )
         self._inputs.changed.connect(self._on_inputs_changed)
         layout.addWidget(self._inputs)
 
         # Destination folder
-        self._dest_label = QLabel("Папка для изображений:")
+        self._dest_label = QLabel(tr("Image folder:"))
         layout.addWidget(self._dest_label)
         row_out = QHBoxLayout()
         self._dest_edit = QLineEdit()
-        self._dest_edit.setPlaceholderText("Куда сохранить картинки...")
-        btn_out = QPushButton("Обзор")
+        self._dest_edit.setPlaceholderText(tr("Where to save the images..."))
+        btn_out = QPushButton(tr("Browse"))
         btn_out.setFixedWidth(80)
-        btn_out.setToolTip("Папка для сохранения (имя <файл>_images добавляется само)")
+        btn_out.setToolTip(tr("Save folder (the <file>_images name is added automatically)"))
         btn_out.clicked.connect(self._browse_dest)
         row_out.addWidget(self._dest_edit)
         row_out.addWidget(btn_out)
         layout.addLayout(row_out)
 
         # Action button (turns into Cancel while a batch is running)
-        self._extract_btn = QPushButton("Извлечь изображения")
+        self._extract_btn = QPushButton(tr("Extract images"))
         self._extract_btn.setObjectName("btn_convert")
         self._extract_btn.setFixedHeight(36)
         self._extract_btn.clicked.connect(self._on_button)
@@ -84,10 +85,10 @@ class ImagesTab(QWidget):
             return
         if self._batch():
             # each file gets its own <name>_images subfolder inside this one
-            self._dest_label.setText("Папка для подпапок с изображениями:")
+            self._dest_label.setText(tr("Folder for the per-file image folders:"))
             self._dest_edit.setText(str(Path(paths[0]).parent))
         else:
-            self._dest_label.setText("Папка для изображений:")
+            self._dest_label.setText(tr("Image folder:"))
             self._dest_edit.setText(str(Path(paths[0]).with_suffix("")) + "_images")
 
     def load_files(self, paths: list[str]) -> None:
@@ -103,7 +104,7 @@ class ImagesTab(QWidget):
 
     def _browse_dest(self) -> None:
         initial = self._dest_edit.text() or settings.last_dir() or str(Path.home())
-        folder = QFileDialog.getExistingDirectory(self, "Выбрать папку для сохранения", initial)
+        folder = QFileDialog.getExistingDirectory(self, tr("Select a save folder"), initial)
         if not folder:
             return
         if self._batch():
@@ -123,14 +124,14 @@ class ImagesTab(QWidget):
         inputs = [p for p in self._inputs.paths() if os.path.isfile(p)]
         missing = self._inputs.count() - len(inputs)
         if missing:
-            self._log.append(f"ℹ Пропущено несуществующих файлов: {missing}")
+            self._log.append(tr("ℹ Skipped missing files: {n}").format(n=missing))
         if not inputs:
-            self._log.append("Укажите входной файл.")
+            self._log.append(tr("Select an input file."))
             return None
 
         target = self._dest_edit.text().strip()
         if not target:
-            self._log.append("Укажите папку для изображений.")
+            self._log.append(tr("Specify a folder for the images."))
             return None
 
         if len(inputs) == 1 and not self._batch():
@@ -142,7 +143,7 @@ class ImagesTab(QWidget):
         if self._runner is not None and self._runner.isRunning():
             self._runner.cancel()
             self._extract_btn.setEnabled(False)
-            self._log.append("ℹ Отмена — ждём завершения текущих файлов...")
+            self._log.append(tr("ℹ Cancelling — waiting for the files in progress..."))
             return
         self._start()
 
@@ -154,7 +155,7 @@ class ImagesTab(QWidget):
             return
         jobs = resolve_batch_conflicts(self, jobs, is_dir=True)
         if not jobs:
-            self._log.append("ℹ Извлечение отменено.")
+            self._log.append(tr("ℹ Extraction cancelled."))
             return
 
         self._last_result = (
@@ -162,15 +163,20 @@ class ImagesTab(QWidget):
         )
         self._log.reset()
         self._log.append(
-            f"▶ Извлечение из: {jobs[0].name}" if len(jobs) == 1
-            else f"▶ Пакетное извлечение: {len(jobs)} файлов"
+            tr("▶ Extracting from: {name}").format(name=jobs[0].name) if len(jobs) == 1
+            else tr("▶ Batch extraction: {n} files").format(n=len(jobs))
         )
-        self._extract_btn.setText("Отмена")
+        self._extract_btn.setText(tr("Cancel"))
+
+        # collect per-file counts so the summary can report how many images
+        # were actually found (a file may simply contain none)
+        self._counts: list[int] = []
+
+        def extract(job: Job) -> None:
+            self._counts.append(images.extract_images_only(job.input_path, job.output_path))
 
         self._runner = BatchRunner(
-            jobs,
-            lambda job: images.extract_images_only(job.input_path, job.output_path),
-            max_workers=pool_size(len(jobs), heavy=False),
+            jobs, extract, max_workers=pool_size(len(jobs), heavy=False)
         )
         self._runner.progress.connect(self._log.set_progress)
         self._runner.message.connect(self._log.append)
@@ -178,13 +184,19 @@ class ImagesTab(QWidget):
         self._runner.start()
 
     def _on_completed(self, ok: int, failed: int) -> None:
-        self._extract_btn.setText("Извлечь изображения")
+        self._extract_btn.setText(tr("Extract images"))
         self._extract_btn.setEnabled(True)
+        total_images = sum(self._counts)
         if failed and ok:
-            self._log.append(f"✓ Обработано: {ok}, с ошибкой: {failed}")
+            self._log.append(tr("✓ Processed: {ok}, failed: {failed}").format(ok=ok, failed=failed))
         elif failed:
-            self._log.append(f"✗ Не удалось обработать файлов: {failed}")
+            self._log.append(tr("✗ Could not process files: {failed}").format(failed=failed))
+        elif not total_images:
+            self._log.append(tr("ℹ No embedded images found in the file."))
         else:
-            self._log.append(f"✓ Готово: {ok} файлов → {self._last_result}")
-        if ok and os.path.isdir(self._last_result):
+            self._log.append(
+                tr("✓ Images extracted: {n} → {path}")
+                .format(n=total_images, path=self._last_result)
+            )
+        if ok and total_images and os.path.isdir(self._last_result):
             self._log.set_result(self._last_result)

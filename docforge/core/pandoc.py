@@ -9,13 +9,14 @@ from pathlib import Path
 from typing import Callable, Optional
 
 from docforge.core import chromium, latex
+from docforge.i18n import tr
 
 log = logging.getLogger(__name__)
 
 # Pandoc code-highlight styles; "" means don't pass the flag (engine default),
 # "--no-highlight" disables highlighting altogether.
 HIGHLIGHT_STYLES = [
-    ("По умолчанию", ""),
+    ("Default", ""),
     ("pygments", "pygments"),
     ("tango", "tango"),
     ("kate", "kate"),
@@ -24,7 +25,7 @@ HIGHLIGHT_STYLES = [
     ("espresso", "espresso"),
     ("zenburn", "zenburn"),
     ("haddock", "haddock"),
-    ("Без подсветки", "--no-highlight"),
+    ("No highlighting", "--no-highlight"),
 ]
 
 # Output formats: (display name, pandoc writer, extension, needs --standalone).
@@ -99,9 +100,9 @@ def _convert_via_chromium(input_path: str, output_path: str, opts: PandocOptions
 
     if not chromium.available():
         log.warning("Pandoc: Chromium/Playwright не установлен")
-        raise PandocError(
-            "движок Chromium не установлен — установите его в диалоге «Компоненты»"
-        )
+        raise PandocError(tr(
+            "the Chromium engine is not installed — install it from the Components dialog"
+        ))
 
     tmp_html = None
     try:
@@ -115,7 +116,7 @@ def _convert_via_chromium(input_path: str, output_path: str, opts: PandocOptions
                 extra_args=["--standalone", "--embed-resources"],
             )
             html_path = tmp_html
-        say("▶ PDF-движок: Chromium")
+        say(tr("▶ PDF engine: {engine}").format(engine="Chromium"))
         chromium.html_to_pdf(html_path, output_path, opts.margin)
     finally:
         if tmp_html and os.path.exists(tmp_html):
@@ -132,12 +133,12 @@ def _build_args(output_path: str, opts: PandocOptions,
         engine = latex.find_pdf_engine()
         if engine is None:
             log.warning("Pandoc: PDF-движок не найден")
-            raise PandocError(
-                "для вывода в PDF нужен LaTeX-движок — установите MiKTeX "
-                "(https://miktex.org), приложение найдёт его автоматически"
-            )
+            raise PandocError(tr(
+                "PDF output needs a LaTeX engine — install MiKTeX (https://miktex.org), "
+                "the app will find it automatically"
+            ))
         log.info("Pandoc: PDF-движок=%s", engine)
-        say(f"▶ PDF-движок: {engine}")
+        say(tr("▶ PDF engine: {engine}").format(engine=engine))
         latex.ensure_autoinstall(engine)
         extra.append(f"--pdf-engine={engine}")
         if latex.is_unicode_engine(engine):
@@ -205,14 +206,14 @@ def convert(input_path: str, output_path: str, opts: PandocOptions,
     except Exception as e:
         msg = str(e)
         if opts.is_pdf and "package" in msg.lower():
-            raise PandocError(
-                f"{msg}\nПохоже, MiKTeX не хватает LaTeX-пакетов: откройте MiKTeX Console → "
-                "Settings и включите 'Always install missing packages on-the-fly'"
-            ) from e
+            raise PandocError(msg + "\n" + tr(
+                "MiKTeX seems to be missing LaTeX packages: open MiKTeX Console → "
+                "Settings and enable 'Always install missing packages on-the-fly'"
+            )) from e
         raise
 
     if media_dir and os.path.isdir(media_dir):
         _relativize_media_paths(output_path, media_dir)
-        say(f"ℹ Картинки извлечены в: {media_dir}")
+        say(tr("ℹ Images extracted to: {path}").format(path=media_dir))
 
     log.info("Pandoc: готово → %s", output_path)

@@ -91,6 +91,7 @@ are extracted with PyMuPDF; other formats via MarkItDown.
 ### General
 
 - Dark theme
+- Russian and English interface — switch it in the status bar (restart to apply)
 - UTF-8 throughout — Cyrillic and other non-Latin text works out of the box
 - Conversion runs in a background thread — UI stays responsive
 - Browse dialogs show only supported file types by default
