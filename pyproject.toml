@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "docforge"
-version = "1.0.0"
+version = "1.0.1"
 description = "Графическая обёртка над MarkItDown и Pandoc для конвертации документов"
 readme = "README.md"
 requires-python = ">=3.10"

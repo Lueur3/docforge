@@ -1,6 +1,6 @@
 ; Inno Setup 6 Script for DocForge
 #define MyAppName "DocForge"
-#define MyAppVersion "1.0.0"
+#define MyAppVersion "1.0.1"
 #define MyAppPublisher "Lueur3"
 #define MyAppURL "https://github.com/Lueur3/docforge"
 #define MyAppExeName "DocForge.exe"

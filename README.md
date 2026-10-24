@@ -115,7 +115,7 @@ are extracted with PyMuPDF; other formats via MarkItDown.
 
 ### 1. Prebuilt Binaries (recommended)
 
-Download `DocForge-Setup-1.0.0.exe` (or the portable `DocForge-Portable-1.0.0.zip`) from the [Releases](https://github.com/Lueur3/docforge/releases) page. The installer configures desktop, start menu, and SendTo shortcuts.
+Download `DocForge-Setup-1.0.1.exe` (or the portable `DocForge-Portable-1.0.1.zip`) from the [Releases](https://github.com/Lueur3/docforge/releases) page. The installer configures desktop, start menu, and SendTo shortcuts.
 
 ### 2. Run from source (for development)
 
@@ -219,7 +219,7 @@ python build_exe.py
 
 - Builds into `dist\DocForge\` (no temporary extraction overhead, startup in ~200–350 ms).
 - Standalone executable: `dist\DocForge\DocForge.exe`.
-- If **Inno Setup 6** is installed, an installer `dist\DocForge-Setup-1.0.0.exe` is generated automatically.
+- If **Inno Setup 6** is installed, an installer `dist\DocForge-Setup-1.0.1.exe` is generated automatically.
 
 ### 2. Manual Inno Setup build
 

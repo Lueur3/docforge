@@ -1,29 +1,27 @@
-# DocForge v1.0.0
+# DocForge v1.0.1
 
 DocForge is a desktop graphical interface for Microsoft MarkItDown and Pandoc, providing document format conversion without command-line usage.
 
-## Performance and Architecture
+## Fixes and Improvements in v1.0.1
 
-- Startup optimization: PyInstaller directory distribution (`--onedir`) replaces single-file extraction, reducing cold launch time to ~200–350 ms.
-- Lazy tab loading: Interface tabs (Pandoc, Images) are instantiated on demand, deferring widget construction until navigated to.
-- Non-blocking initialization: Auxiliary component discovery (ffmpeg, pydub) is deferred to the event loop after the main window is rendered.
+- **Immediate cancellation and process termination**: Cancelling conversion jobs now immediately terminates running child processes (including `pandoc.exe`), eliminating background stalls and thread hangs.
+- **Pandoc memory guard**: Implemented a 4 GB Haskell RTS heap limit (`+RTS -M4G -RTS`) to prevent pathological input files (such as massive HTML documents with inline base64 images) from consuming excessive physical RAM and causing system thrashing.
+- **Large file guidance**: Added a notice for HTML files exceeding 30 MB when targeting Markdown, recommending the MarkItDown tab for faster, memory-efficient processing.
+- **System language detection**: The application now detects the Windows display language on first run (Russian on Russian Windows, English for all other system languages).
+- **Explorer context menu synchronization**: Changing interface language now automatically updates registered context menu labels in the Windows Registry without requiring manual re-registration.
 
-## Packaging and Distribution
+## Distribution
 
-- Windows installer (`DocForge-Setup-1.0.0.exe`) built via Inno Setup with desktop, start menu, and "Send to" integration. Installs per-user without requiring administrator privileges (`HKCU`).
-- Standalone portable archive (`DocForge-Portable-v1.0.0.zip`) containing the uncompressed executable and bundled runtime dependencies.
-- Zero local Python requirement for end users: core runtime and libraries are precompiled.
+- **Installer**: `DocForge-Setup-1.0.1.exe` (per-user Inno Setup installer).
+- **Portable**: `DocForge-Portable-v1.0.1.zip` (standalone directory archive).
 
-## Core Features Summary
+---
 
-- **MarkItDown conversion**: Converts Word (`.docx`), PowerPoint (`.pptx`), Excel (`.xlsx`), PDF, HTML, and audio/image files to Markdown. Supports automatic base64 image extraction to relative file paths.
-- **Pandoc conversion**: Bidirectional conversions across Markdown, HTML, DOCX, PDF, EPUB, LaTeX, RTF, ODT, and plain text. Includes conversion presets and dual PDF backends (XeLaTeX and Chromium).
-- **Direct image extraction**: Extracts embedded images directly from PDF, DOCX, and PPTX to a target directory.
+## Core Features Overview
+
+- **MarkItDown conversion**: Word (`.docx`), PowerPoint (`.pptx`), Excel (`.xlsx`), PDF, HTML, and audio/image files to Markdown with automatic media extraction.
+- **Pandoc conversion**: Bidirectional conversions across Markdown, HTML, DOCX, PDF, EPUB, LaTeX, RTF, ODT, and plain text with dual PDF engines (XeLaTeX and Chromium).
+- **Image extraction**: Direct extraction of embedded images from PDF, DOCX, and PPTX documents.
 - **Batch processing**: Multi-file selection, directory scanning, drag-and-drop, worker pool execution, and file overwrite protection.
-- **OS integration**: Optional Windows Explorer context menu and "Send to" menu registration.
-- **Localization**: Interface available in English and Russian, switchable via the status bar.
-
-## Installation
-
-- **Installer**: Run `DocForge-Setup-1.0.0.exe` and complete the setup wizard.
-- **Portable**: Extract `DocForge-Portable-v1.0.0.zip` and run `DocForge.exe`.
+- **OS integration**: Optional Windows Explorer context menu and "Send to" menu shortcuts.
+- **Performance**: Instant cold startup (~200–350 ms) via onedir distribution and lazy widget initialization.
