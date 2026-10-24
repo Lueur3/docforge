@@ -113,9 +113,9 @@ are extracted with PyMuPDF; other formats via MarkItDown.
 
 ## Installation and Usage
 
-### 1. Prebuilt Installer (recommended)
+### 1. Prebuilt Binaries (recommended)
 
-Download `DocForge-Setup-1.0.0.exe` from the [Releases](https://github.com/Lueur3/docforge/releases) page and run the installer. Shortcuts will be created on the desktop, start menu, and SendTo menu.
+Download `DocForge-Setup-1.0.0.exe` (or the portable `DocForge-Portable-1.0.0.zip`) from the [Releases](https://github.com/Lueur3/docforge/releases) page. The installer configures desktop, start menu, and SendTo shortcuts.
 
 ### 2. Run from source (for development)
 

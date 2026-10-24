@@ -27,12 +27,16 @@ PrivilegesRequired=lowest
 PrivilegesRequiredOverridesAllowed=dialog
 
 [Languages]
-Name: "russian"; MessagesFile: "compiler:Languages\Russian.isl"
 Name: "english"; MessagesFile: "compiler:Default.isl"
+Name: "russian"; MessagesFile: "compiler:Languages\Russian.isl"
+
+[CustomMessages]
+english.SendToDesc=Add to "Send to" menu
+russian.SendToDesc=Добавить в меню «Отправить» (SendTo)
 
 [Tasks]
 Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{cm:AdditionalIcons}"; Flags: unchecked
-Name: "sendto"; Description: "Добавить в меню «Отправить» (SendTo)"; GroupDescription: "{cm:AdditionalIcons}"
+Name: "sendto"; Description: "{cm:SendToDesc}"; GroupDescription: "{cm:AdditionalIcons}"
 
 [Files]
 Source: "dist\DocForge\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
