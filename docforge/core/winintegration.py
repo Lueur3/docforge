@@ -8,6 +8,7 @@ import subprocess
 import sys
 from pathlib import Path
 
+from docforge.core.paths import app_dir, get_resource_path, is_frozen
 from docforge.i18n import tr
 from docforge.proc import NO_WINDOW
 
@@ -29,11 +30,13 @@ _SHELL_KEY = r"Software\Classes\SystemFileAssociations\{ext}\shell\{verb}"
 
 def _repo_root() -> Path:
     """Repository root — the folder holding main.py."""
-    return Path(__file__).resolve().parents[2]
+    return app_dir()
 
 
 def launcher() -> tuple[str, Path]:
-    """Return (pythonw path, main.py path) used to start the app windowless."""
+    """Return (executable/pythonw path, script/exe path)."""
+    if is_frozen():
+        return sys.executable, Path(sys.executable)
     exe = Path(sys.executable)
     windowless = exe.with_name("pythonw.exe")
     if not windowless.is_file():
@@ -42,10 +45,12 @@ def launcher() -> tuple[str, Path]:
 
 
 def icon_path() -> Path:
-    return Path(__file__).resolve().parents[1] / "resources" / "app.ico"
+    return get_resource_path("app.ico")
 
 
 def _command() -> str:
+    if is_frozen():
+        return f'"{sys.executable}" "%1"'
     exe, script = launcher()
     return f'"{exe}" "{script}" "%1"'
 
@@ -114,13 +119,24 @@ def install_sendto() -> None:
     exe, script = launcher()
     lnk = sendto_shortcut()
     lnk.parent.mkdir(parents=True, exist_ok=True)
+    if is_frozen():
+        target = exe
+        arguments = ""
+        work_dir = Path(exe).parent
+        icon_loc = str(icon_path()) if icon_path().is_file() else f"{exe},0"
+    else:
+        target = exe
+        arguments = f'\"{script}\"'
+        work_dir = script.parent
+        icon_loc = str(icon_path())
+
     ps = (
         "$w = New-Object -ComObject WScript.Shell; "
         f"$s = $w.CreateShortcut('{lnk}'); "
-        f"$s.TargetPath = '{exe}'; "
-        f"$s.Arguments = '\"{script}\"'; "
-        f"$s.WorkingDirectory = '{script.parent}'; "
-        f"$s.IconLocation = '{icon_path()}'; "
+        f"$s.TargetPath = '{target}'; "
+        f"$s.Arguments = '{arguments}'; "
+        f"$s.WorkingDirectory = '{work_dir}'; "
+        f"$s.IconLocation = '{icon_loc}'; "
         "$s.Description = 'DocForge'; "
         "$s.Save()"
     )

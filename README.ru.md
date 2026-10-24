@@ -207,32 +207,65 @@ PDF выглядит как веб-страница — вся ширина, с�
 
 ---
 
+## Сборка в .exe и установщик
+
+Для создания автономного приложения без необходимости запускать Python вручную:
+
+### 1. Быстрая сборка (PyInstaller `--onedir`)
+
+```bash
+python build_exe.py
+```
+
+- Собирает проект в директорию `dist\DocForge\` (без накладных расходов на распаковку в `%TEMP%`, запуск за ~200–350 мс).
+- Исполняемый файл: `dist\DocForge\DocForge.exe`.
+- Если на компьютере установлен **Inno Setup 6**, скрипт автоматически соберет инсталлятор `dist\DocForge-Setup-1.0.0.exe`.
+
+### 2. Сборка установщика Inno Setup вручную
+
+Откройте `installer.iss` в Inno Setup Compiler и нажмите **Compile** (или выполните `iscc installer.iss`).
+
+### 3. Компиляция в машинный код (Nuitka)
+
+Для максимальной скорости и компиляции Python в машинный C-код:
+
+```bash
+pip install nuitka
+python build_nuitka.py
+```
+
+---
+
 ## Структура проекта
 
 ```
 main.py                    лаунчер (запускается из DocForge.bat)
+build_exe.py               сборка standalone .exe (PyInstaller onedir + Inno Setup)
+build_nuitka.py            компиляция проекта через Nuitka
+docforge.spec              спецификация сборки PyInstaller
+installer.iss              скрипт инсталлятора Inno Setup
 pyproject.toml             метаданные пакета, зависимости, конфиг ruff
 tests/test_smoke.py        офлайн-самопроверка всех путей конвертации
 docforge/
   app.py                   точка входа: лог, тема, зависимости, окно
   theme.py                 тёмная тема
-  logging_setup.py         запись лога в файл
+  logging_setup.py         запись лога в файл (без блокировок на старте)
   proc.py                  общий флаг subprocess (без окна консоли)
   core/                    логика, без UI
     markitdown.py          файл → Markdown
     pandoc.py              форматы/опции Pandoc + сама конвертация
     batch.py               очередь задач, пул воркеров, прогресс
     presets.py             именованные наборы настроек Pandoc
-    paths.py               свободные имена результата, сравнение путей
+    paths.py               свободные имена, определение runtime/frozen путей
     errors.py              понятные формулировки файловых ошибок
-    winintegration.py      пункт Проводника + ярлык «Отправить» (HKCU)
+    winintegration.py      пункт Проводника + ярлык «Отправить» (HKCU / .exe)
     images.py              извлечение картинок (MarkItDown + PyMuPDF)
     chromium.py            HTML → PDF через Playwright/Chromium
     latex.py               поиск LaTeX-движка (MiKTeX)
     ffmpeg.py              поиск ffmpeg
     installer.py           проверка и установка зависимостей
   ui/                      интерфейс PyQt6
-    window.py              главное окно
+    window.py              главное окно с ленивой загрузкой вкладок (LazyTabWidget)
     setup_dialog.py        диалог «Компоненты»
     widgets.py             строка статуса + окно лога
     inputs.py              общий выбор файлов/папки для вкладок

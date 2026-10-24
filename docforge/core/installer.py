@@ -9,6 +9,7 @@ from pathlib import Path
 from PyQt6.QtCore import QThread, pyqtSignal
 
 from docforge.core import latex
+from docforge.core.paths import is_frozen
 from docforge.i18n import tr
 from docforge.proc import NO_WINDOW
 
@@ -31,6 +32,8 @@ def module_present(name: str) -> bool:
 
 
 def markitdown_installed() -> bool:
+    if is_frozen():
+        return True
     return module_present("markitdown")
 
 
@@ -40,6 +43,8 @@ def pandoc_installed() -> bool:
     Spawns Pandoc as a process, so it is only used in the setup dialog,
     never on the fast startup path."""
     try:
+        from docforge.core.paths import find_bundled_pandoc
+        find_bundled_pandoc()
         import pypandoc
         pypandoc.get_pandoc_version()
         return True
@@ -84,25 +89,27 @@ class SetupWorker(QThread):
         )
 
     def run(self) -> None:
-        log.info("Настройка: ядро=%s, ffmpeg=%s, miktex=%s, chromium=%s",
-                 self._core, self._ffmpeg, self._miktex, self._chromium)
+        log.info("Настройка: ядро=%s, ffmpeg=%s, miktex=%s, chromium=%s (frozen=%s)",
+                 self._core, self._ffmpeg, self._miktex, self._chromium, is_frozen())
         try:
             if self._core:
-                if not markitdown_installed():
-                    self.status.emit(tr("Installing MarkItDown from pypi.org..."))
-                    self._pip("markitdown[all]")
-                self.status.emit(tr("Installing pypandoc from pypi.org..."))
-                self._pip("pypandoc")
-                self.status.emit(tr("Installing PyMuPDF from pypi.org..."))
-                self._pip("pymupdf")
+                if not is_frozen():
+                    if not markitdown_installed():
+                        self.status.emit(tr("Installing MarkItDown from pypi.org..."))
+                        self._pip("markitdown[all]")
+                    self.status.emit(tr("Installing pypandoc from pypi.org..."))
+                    self._pip("pypandoc")
+                    self.status.emit(tr("Installing PyMuPDF from pypi.org..."))
+                    self._pip("pymupdf")
                 if not pandoc_installed():
                     self.status.emit(tr("Downloading Pandoc from github.com/jgm/pandoc (may take a minute)..."))
                     import pypandoc
                     pypandoc.download_pandoc()
 
             if self._ffmpeg:
-                self.status.emit(tr("Installing ffmpeg (imageio-ffmpeg) from pypi.org..."))
-                self._pip("imageio-ffmpeg")
+                if not is_frozen():
+                    self.status.emit(tr("Installing ffmpeg (imageio-ffmpeg) from pypi.org..."))
+                    self._pip("imageio-ffmpeg")
 
             if self._miktex:
                 self.status.emit(tr("Installing MiKTeX via winget (may take 5–10 minutes)..."))
@@ -114,11 +121,13 @@ class SetupWorker(QThread):
                     latex.ensure_autoinstall(engine)
 
             if self._chromium:
-                self.status.emit(tr("Installing Playwright from pypi.org..."))
-                self._pip("playwright")
+                if not is_frozen():
+                    self.status.emit(tr("Installing Playwright from pypi.org..."))
+                    self._pip("playwright")
                 self.status.emit(tr("Downloading Chromium (~150 MB, may take a few minutes)..."))
+                cmd = ["playwright", "install", "chromium"] if is_frozen() else [sys.executable, "-m", "playwright", "install", "chromium"]
                 subprocess.check_call(
-                    [sys.executable, "-m", "playwright", "install", "chromium"],
+                    cmd,
                     stdout=subprocess.DEVNULL,
                     stderr=subprocess.DEVNULL,
                     creationflags=NO_WINDOW,
@@ -138,4 +147,6 @@ def mark_setup_done() -> None:
 
 def core_ready() -> bool:
     """Fast check that the core is ready (without spawning Pandoc)."""
+    if is_frozen():
+        return True
     return MARKER.exists() and module_present("markitdown") and module_present("pypandoc")

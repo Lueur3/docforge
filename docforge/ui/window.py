@@ -19,6 +19,45 @@ from docforge.ui.tabs.pandoc import PandocTab
 log = logging.getLogger(__name__)
 
 
+class LazyTabWidget(QTabWidget):
+    """QTabWidget that delays instantiating hidden tabs until needed."""
+
+    def __init__(self, parent: QWidget | None = None) -> None:
+        super().__init__(parent)
+        self._factories: dict[int, callable] = {}
+        self.currentChanged.connect(self._ensure_loaded)
+
+    def add_lazy_tab(self, factory, label: str) -> int:
+        idx = self.count()
+        self._factories[idx] = factory
+        return super().addTab(QWidget(), label)
+
+    def _ensure_loaded(self, index: int) -> None:
+        factory = self._factories.pop(index, None)
+        if factory is not None:
+            prev_blocked = self.blockSignals(True)
+            curr = self.currentIndex()
+            real_widget = factory()
+            label = self.tabText(index)
+            self.removeTab(index)
+            self.insertTab(index, real_widget, label)
+            if curr == index:
+                super().setCurrentIndex(index)
+            self.blockSignals(prev_blocked)
+
+    def widget(self, index: int) -> QWidget:
+        self._ensure_loaded(index)
+        return super().widget(index)
+
+    def currentWidget(self) -> QWidget:
+        self._ensure_loaded(self.currentIndex())
+        return super().currentWidget()
+
+    def setCurrentIndex(self, index: int) -> None:
+        self._ensure_loaded(index)
+        super().setCurrentIndex(index)
+
+
 class MainWindow(QMainWindow):
     def __init__(self, log_file: Path | None = None) -> None:
         super().__init__()
@@ -28,10 +67,10 @@ class MainWindow(QMainWindow):
         # here, and each tab's trailing stretch pins its fields to the top
         self.setFixedSize(640, 460)
 
-        self._tabs = QTabWidget()
+        self._tabs = LazyTabWidget()
         self._tabs.addTab(MarkItDownTab(), "MarkItDown")
-        self._tabs.addTab(PandocTab(), "Pandoc")
-        self._tabs.addTab(ImagesTab(), tr("Images"))
+        self._tabs.add_lazy_tab(lambda: PandocTab(), "Pandoc")
+        self._tabs.add_lazy_tab(lambda: ImagesTab(), tr("Images"))
         self._tabs.setCornerWidget(self._build_corner())
 
         self.setCentralWidget(self._tabs)

@@ -25,16 +25,13 @@ def _log_environment(log: logging.Logger) -> None:
     log.info("DocForge — старт сессии")
     log.info("ОС: %s", platform.platform())
     log.info("Python: %s (%s)", platform.python_version(), sys.executable)
+    if getattr(sys, "frozen", False):
+        log.info("Режим: скомпилированный standalone (.exe)")
     for pkg in ("PyQt6", "markitdown", "pypandoc", "pymupdf", "imageio-ffmpeg", "playwright"):
         try:
             log.info("Пакет %s: %s", pkg, version(pkg))
-        except PackageNotFoundError:
-            log.info("Пакет %s: не установлен", pkg)
-    try:
-        import pypandoc
-        log.info("Pandoc (бинарник): %s", pypandoc.get_pandoc_version())
-    except Exception as e:
-        log.info("Pandoc (бинарник): недоступен (%s)", e)
+        except (PackageNotFoundError, Exception):
+            pass
 
 
 def _qt_message_handler(mode, context, message: str) -> None:
@@ -51,16 +48,24 @@ def setup_logging() -> Path:
     if root.handlers:  # already configured
         return LOG_FILE
 
-    LOG_DIR.mkdir(parents=True, exist_ok=True)
-    root.setLevel(logging.DEBUG)
     fmt = logging.Formatter(_FORMAT, datefmt=_DATEFMT)
+    root.setLevel(logging.DEBUG)
 
-    file_handler = logging.handlers.RotatingFileHandler(
-        LOG_FILE, maxBytes=1_000_000, backupCount=3, encoding="utf-8"
-    )
-    file_handler.setLevel(logging.DEBUG)
-    file_handler.setFormatter(fmt)
-    root.addHandler(file_handler)
+    try:
+        LOG_DIR.mkdir(parents=True, exist_ok=True)
+        file_handler = logging.handlers.RotatingFileHandler(
+            LOG_FILE, maxBytes=1_000_000, backupCount=3, encoding="utf-8"
+        )
+        file_handler.setLevel(logging.DEBUG)
+        file_handler.setFormatter(fmt)
+        root.addHandler(file_handler)
+    except OSError as e:
+        if sys.stderr is not None:
+            fallback = logging.StreamHandler(sys.stderr)
+            fallback.setLevel(logging.DEBUG)
+            fallback.setFormatter(fmt)
+            root.addHandler(fallback)
+        root.warning("Не удалось инициализировать файл лога %s: %s", LOG_FILE, e)
 
     for noisy in _NOISY_LOGGERS:
         logging.getLogger(noisy).setLevel(logging.WARNING)

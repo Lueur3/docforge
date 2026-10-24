@@ -204,32 +204,65 @@ the folder. When reporting a problem, attach this file.
 
 ---
 
+## Building Executable (.exe) and Installer
+
+To create a standalone application without requiring Python:
+
+### 1. Fast build (PyInstaller `--onedir`)
+
+```bash
+python build_exe.py
+```
+
+- Builds into `dist\DocForge\` (no temporary extraction overhead, startup in ~200–350 ms).
+- Standalone executable: `dist\DocForge\DocForge.exe`.
+- If **Inno Setup 6** is installed, an installer `dist\DocForge-Setup-1.0.0.exe` is generated automatically.
+
+### 2. Manual Inno Setup build
+
+Open `installer.iss` in Inno Setup Compiler and click **Compile** (or run `iscc installer.iss`).
+
+### 3. Native machine code compilation (Nuitka)
+
+For compiling Python to C machine code:
+
+```bash
+pip install nuitka
+python build_nuitka.py
+```
+
+---
+
 ## Project structure
 
 ```
 main.py                    launcher (run by DocForge.bat)
+build_exe.py               build standalone .exe (PyInstaller onedir + Inno Setup)
+build_nuitka.py            compile with Nuitka
+docforge.spec              PyInstaller build specification
+installer.iss              Inno Setup installer script
 pyproject.toml             package metadata, dependencies, ruff config
 tests/test_smoke.py        offline self-test of all conversion paths
 docforge/
   app.py                   entry point: logging, theme, deps, window
   theme.py                 dark theme
-  logging_setup.py         file logging
+  logging_setup.py         file logging (non-blocking on startup)
   proc.py                  shared subprocess flag (no console window)
   core/                    logic, no UI
     markitdown.py          file → Markdown
     pandoc.py              Pandoc formats/options + the conversion routine
     batch.py               job queue, worker pool, progress
     presets.py             named Pandoc setting sets
-    paths.py               free output names, path comparison
+    paths.py               free output names, runtime/frozen path helpers
     errors.py              readable wording for file errors
-    winintegration.py      Explorer verb + SendTo shortcut (HKCU)
+    winintegration.py      Explorer verb + SendTo shortcut (HKCU / .exe)
     images.py              image extraction (MarkItDown + PyMuPDF)
     chromium.py            HTML → PDF via Playwright/Chromium
     latex.py               LaTeX engine discovery (MiKTeX)
     ffmpeg.py              ffmpeg discovery
     installer.py           dependency checks + install worker
   ui/                      PyQt6 interface
-    window.py              main window
+    window.py              main window with lazy tab loading (LazyTabWidget)
     setup_dialog.py        Components dialog
     widgets.py             status line + log window
     inputs.py              file/folder selector shared by the tabs
