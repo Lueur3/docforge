@@ -111,7 +111,13 @@ are extracted with PyMuPDF; other formats via MarkItDown.
 
 ---
 
-## Installation
+## Installation and Usage
+
+### 1. Prebuilt Installer (recommended)
+
+Download `DocForge-Setup-1.0.0.exe` from the [Releases](https://github.com/Lueur3/docforge/releases) page and run the installer. Shortcuts will be created on the desktop, start menu, and SendTo menu.
+
+### 2. Run from source (for development)
 
 ```bash
 git clone https://github.com/Lueur3/docforge.git
@@ -124,9 +130,6 @@ python main.py
 
 Dependencies are declared in `pyproject.toml`, so `pip install -e .` installs everything
 and also registers a `docforge` command. A virtual environment is optional but recommended.
-
-After that, launch the app by double-clicking **DocForge.bat**.
-If the app fails to start, run **DocForge-debug.bat** to see the error message.
 
 On the first launch, a setup window lists every component with its download source.
 MarkItDown and Pandoc (required core) are installed automatically; the optional
@@ -236,7 +239,7 @@ python build_nuitka.py
 ## Project structure
 
 ```
-main.py                    launcher (run by DocForge.bat)
+main.py                    entry point (run: python main.py)
 build_exe.py               build standalone .exe (PyInstaller onedir + Inno Setup)
 build_nuitka.py            compile with Nuitka
 docforge.spec              PyInstaller build specification

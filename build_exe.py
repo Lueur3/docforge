@@ -66,8 +66,9 @@ def check_inno_setup() -> Path | None:
     if iscc:
         return Path(iscc)
 
-    # Standard 64-bit and 32-bit Program Files locations
+    # Standard user-local, 64-bit and 32-bit Program Files locations
     candidates = [
+        Path(os.environ.get("LOCALAPPDATA", "")) / "Programs" / "Inno Setup 6" / "ISCC.exe",
         Path(os.environ.get("ProgramFiles(x86)", r"C:\Program Files (x86)")) / "Inno Setup 6" / "ISCC.exe",
         Path(os.environ.get("ProgramFiles", r"C:\Program Files")) / "Inno Setup 6" / "ISCC.exe",
     ]

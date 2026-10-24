@@ -64,6 +64,7 @@ a = Analysis(
         "IPython",
         "zmq",
         "tornado",
+        "playwright",
     ],
     win_no_prefer_redirects=False,
     win_private_assemblies=False,

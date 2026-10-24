@@ -1,4 +1,4 @@
-"""DocForge entry point — thin launcher (started by DocForge.bat)."""
+"""DocForge entry point."""
 import os
 import sys
 import warnings

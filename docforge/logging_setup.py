@@ -70,8 +70,7 @@ def setup_logging() -> Path:
     for noisy in _NOISY_LOGGERS:
         logging.getLogger(noisy).setLevel(logging.WARNING)
 
-    # a console only exists when started via python/DocForge-debug.bat;
-    # under pythonw sys.stderr is None, so no console handler is needed
+    # a console only exists when started in terminal; under GUI/pythonw sys.stderr is None
     if sys.stderr is not None:
         console = logging.StreamHandler()
         console.setLevel(logging.INFO)
