@@ -123,6 +123,16 @@ class MainWindow(QMainWindow):
             return
         settings.put("ui/language", code)
         i18n.set_language(code)
+
+        # Sync context menu language if currently installed
+        try:
+            from docforge.core import winintegration as wi
+            from docforge.ui.integration_dialog import MENU_EXTS
+            if any(wi.context_menu_installed(ext) for ext in MENU_EXTS):
+                wi.update_context_menu_label(MENU_EXTS)
+        except Exception as e:
+            log.debug("Не удалось обновить язык контекстного меню: %s", e)
+
         # widgets take their text at build time, so a restart is the honest
         # way to apply it everywhere (dialogs, tab titles, tooltips)
         QMessageBox.information(

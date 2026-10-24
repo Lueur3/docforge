@@ -143,7 +143,7 @@ class ImagesTab(QWidget):
         if self._runner is not None and self._runner.isRunning():
             self._runner.cancel()
             self._extract_btn.setEnabled(False)
-            self._log.append(tr("ℹ Cancelling — waiting for the files in progress..."))
+            self._log.append(tr("ℹ Cancelling..."))
             return
         self._start()
 

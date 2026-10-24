@@ -85,6 +85,23 @@ def install_context_menu(exts: list[str]) -> None:
     log.info("Контекстное меню: зарегистрировано для %d расширений", len(exts))
 
 
+def update_context_menu_label(exts: list[str]) -> None:
+    """Update the context menu verb label for installed extensions to current language."""
+    import winreg
+    label = verb_label()
+    updated = 0
+    for ext in exts:
+        key = _SHELL_KEY.format(ext=ext, verb=VERB)
+        try:
+            with winreg.OpenKey(winreg.HKEY_CURRENT_USER, key, 0, winreg.KEY_SET_VALUE) as k:
+                winreg.SetValueEx(k, None, 0, winreg.REG_SZ, label)
+                updated += 1
+        except OSError:
+            pass
+    if updated:
+        log.info("Контекстное меню: обновлена надпись на «%s» для %d расширений", label, updated)
+
+
 def uninstall_context_menu(exts: list[str]) -> None:
     import winreg
     removed = 0

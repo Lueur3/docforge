@@ -28,10 +28,32 @@ def set_language(code: str) -> None:
     log.info("Язык интерфейса: %s", code)
 
 
+def detect_system_language() -> str:
+    """Return 'ru' if Windows UI language is Russian, else 'en'."""
+    try:
+        import ctypes
+        lang_id = ctypes.windll.kernel32.GetUserDefaultUILanguage()
+        if (lang_id & 0x3FF) == 0x19:  # LANG_RUSSIAN
+            return "ru"
+    except Exception:
+        pass
+    try:
+        import locale
+        loc = locale.getlocale()[0]
+        if loc and loc.lower().startswith("ru"):
+            return "ru"
+    except Exception:
+        pass
+    return "en"
+
+
 def load_language() -> str:
-    """Restore the saved language (called once at startup)."""
+    """Restore the saved language, or auto-detect system language on first launch."""
     from docforge import settings
-    set_language(settings.get_str("ui/language", DEFAULT))
+    saved = settings.get_str("ui/language", "")
+    if not saved or saved not in LANGUAGES:
+        saved = detect_system_language()
+    set_language(saved)
     return _current
 
 
@@ -97,6 +119,7 @@ RU: dict[str, str] = {
     "Specify where to save the result.": "Укажите, куда сохранить результат.",
     "ℹ Skipped missing files: {n}": "ℹ Пропущено несуществующих файлов: {n}",
     "ℹ Conversion cancelled.": "ℹ Конвертация отменена.",
+    "ℹ Cancelling...": "ℹ Отмена...",
     "ℹ Cancelling — waiting for the files in progress...":
         "ℹ Отмена — ждём завершения текущих файлов...",
     "✗ Could not create the output folder: {e}":
@@ -145,6 +168,8 @@ RU: dict[str, str] = {
         "▶ Пакетная конвертация в .{ext}: {n} файлов",
     "▶ PDF engine: {engine}": "▶ PDF-движок: {engine}",
     "ℹ Images extracted to: {path}": "ℹ Картинки извлечены в: {path}",
+    "ℹ Note: Large HTML file ({size} MB). If conversion is slow or memory-heavy, the MarkItDown tab is recommended.":
+        "ℹ Большой HTML-файл ({size} МБ). Если конвертация медленная или требует много памяти, рекомендуется вкладка MarkItDown.",
 
     # --- Images tab --------------------------------------------------------
     "Extracting images from files (docx, pptx, pdf, epub and others)":
@@ -258,6 +283,10 @@ RU: dict[str, str] = {
     "and enable 'Always install missing packages on-the-fly'":
         "похоже, MiKTeX не хватает LaTeX-пакетов: откройте MiKTeX Console → "
         "Settings и включите 'Always install missing packages on-the-fly'",
+    "Pandoc exceeded the memory limit (4 GB). For large HTML documents, please use the MarkItDown tab.":
+        "Pandoc превысил лимит памяти (4 ГБ). Для больших HTML-документов используйте вкладку MarkItDown.",
+    "No pandoc was found: please install Pandoc from the Components dialog.":
+        "Pandoc не найден: установите его через диалог «Компоненты».",
 
     # --- presets (core/presets.py) -----------------------------------------
     "Print-ready — PDF, 2 cm margins": "Для печати — PDF, поля 2 см",

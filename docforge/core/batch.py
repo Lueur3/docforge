@@ -1,6 +1,9 @@
 """Job queue for batch conversion: a worker pool plus progress reporting."""
+import contextlib
 import logging
 import os
+import subprocess
+import threading
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass
 from pathlib import Path
@@ -49,23 +52,54 @@ class BatchRunner(QThread):
     message     = pyqtSignal(str)            # a line for the log
     completed   = pyqtSignal(int, int)       # succeeded, failed
 
-    def __init__(self, jobs: list[Job], fn: Callable[[Job], None],
+    def __init__(self, jobs: list[Job], fn: Callable[..., None],
                  max_workers: int = 1) -> None:
         super().__init__()
         self._jobs = jobs
         self._fn = fn
         self._max_workers = max(1, max_workers)
         self._cancelled = False
+        self._active_procs: set[subprocess.Popen] = set()
+        self._lock = threading.Lock()
+
+    def register_process(self, proc: subprocess.Popen) -> None:
+        with self._lock:
+            if self._cancelled:
+                with contextlib.suppress(Exception):
+                    proc.kill()
+            else:
+                self._active_procs.add(proc)
+
+    def unregister_process(self, proc: subprocess.Popen) -> None:
+        with self._lock:
+            self._active_procs.discard(proc)
 
     def cancel(self) -> None:
-        """Stop after the jobs already running finish."""
+        """Stop pending jobs and immediately terminate all running processes."""
         self._cancelled = True
-        log.info("Пакетная обработка: запрошена отмена")
+        log.info("Пакетная обработка: запрошена немедленная отмена")
+        with self._lock:
+            for proc in list(self._active_procs):
+                try:
+                    log.info("Принудительное завершение процесса PID %s", proc.pid)
+                    proc.kill()
+                except Exception as e:
+                    log.debug("Ошибка при kill: %s", e)
 
     def _guarded(self, job: Job) -> None:
         if self._cancelled:
             raise RuntimeError(tr("cancelled by the user"))
-        self._fn(job)
+
+        def on_proc(proc: subprocess.Popen) -> None:
+            self.register_process(proc)
+
+        try:
+            self._fn(job, on_proc=on_proc)
+        except TypeError:
+            self._fn(job)
+
+        if self._cancelled:
+            raise RuntimeError(tr("cancelled by the user"))
 
     def run(self) -> None:
         total = len(self._jobs)
@@ -82,8 +116,11 @@ class BatchRunner(QThread):
                         self.message.emit(f"✓ {job.name}")
                 except Exception as e:
                     failed += 1
-                    log.exception("Пакетная обработка: ошибка на %s", job.input_path)
-                    self.message.emit(f"✗ {job.name}: {friendly_error(e)}")
+                    if self._cancelled:
+                        self.message.emit(f"✗ {job.name}: {tr('cancelled by the user')}")
+                    else:
+                        log.exception("Пакетная обработка: ошибка на %s", job.input_path)
+                        self.message.emit(f"✗ {job.name}: {friendly_error(e)}")
                 self.progress.emit(done, total, job.name)
         log.info("Пакетная обработка: успешно %d, с ошибкой %d", ok, failed)
         self.completed.emit(ok, failed)

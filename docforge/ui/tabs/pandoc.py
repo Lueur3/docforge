@@ -367,7 +367,7 @@ class PandocTab(QWidget):
         if self._runner is not None and self._runner.isRunning():
             self._runner.cancel()
             self._convert_btn.setEnabled(False)
-            self._log.append(tr("ℹ Cancelling — waiting for the files in progress..."))
+            self._log.append(tr("ℹ Cancelling..."))
             return
         self._start()
 
@@ -404,7 +404,9 @@ class PandocTab(QWidget):
         say = self._log.append if len(jobs) == 1 else (lambda _m: None)
         self._runner = BatchRunner(
             jobs,
-            lambda job: pandoc.convert(job.input_path, job.output_path, opts, say),
+            lambda job, on_proc=None: pandoc.convert(
+                job.input_path, job.output_path, opts, say, on_proc=on_proc
+            ),
             max_workers=pool_size(len(jobs), heavy=opts.is_heavy),
         )
         self._runner.progress.connect(self._log.set_progress)

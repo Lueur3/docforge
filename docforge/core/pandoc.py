@@ -2,6 +2,8 @@
 import contextlib
 import logging
 import os
+import shutil
+import subprocess
 import tempfile
 import urllib.parse
 from dataclasses import dataclass
@@ -10,6 +12,7 @@ from typing import Callable, Optional
 
 from docforge.core import chromium, latex
 from docforge.i18n import tr
+from docforge.proc import NO_WINDOW
 
 log = logging.getLogger(__name__)
 
@@ -72,6 +75,77 @@ class PandocOptions:
         return self.is_pdf
 
 
+def get_pandoc_path() -> str:
+    """Find usable pandoc executable path."""
+    env_p = os.environ.get("PYPANDOC_PANDOC")
+    if env_p and os.path.isfile(env_p):
+        return env_p
+
+    from docforge.core.paths import find_bundled_pandoc
+    bundled = find_bundled_pandoc()
+    if bundled and bundled.is_file():
+        return str(bundled)
+
+    try:
+        import pypandoc
+        path = pypandoc.get_pandoc_path()
+        if path and os.path.isfile(path):
+            return path
+    except Exception:
+        pass
+
+    candidates = [
+        Path(os.environ.get("LOCALAPPDATA", "")) / "Pandoc" / "pandoc.exe",
+        Path(os.environ.get("ProgramFiles", r"C:\Program Files")) / "Pandoc" / "pandoc.exe",
+        Path(os.environ.get("ProgramFiles(x86)", r"C:\Program Files (x86)")) / "Pandoc" / "pandoc.exe",
+    ]
+    for c in candidates:
+        if c.is_file():
+            return str(c)
+
+    sys_p = shutil.which("pandoc")
+    if sys_p:
+        return sys_p
+
+    raise OSError(tr("No pandoc was found: please install Pandoc from the Components dialog."))
+
+
+def _run_pandoc(args: list[str],
+                on_proc: Optional[Callable[[subprocess.Popen], None]] = None) -> None:
+    """Run pandoc with Haskell RTS heap limits and process tracking."""
+    pandoc_exe = get_pandoc_path()
+    # Haskell RTS limit: caps heap at 4 GB to prevent exhausting system memory
+    cmd = [pandoc_exe, "+RTS", "-M4G", "-RTS"] + args
+    log.debug("Pandoc run: %s", cmd)
+
+    env = os.environ.copy()
+    proc = subprocess.Popen(
+        cmd,
+        stdin=subprocess.DEVNULL,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        env=env,
+        creationflags=NO_WINDOW,
+    )
+    if on_proc is not None:
+        on_proc(proc)
+
+    try:
+        stdout, stderr = proc.communicate()
+    except Exception:
+        with contextlib.suppress(Exception):
+            proc.kill()
+        raise
+
+    if proc.returncode != 0:
+        err = stderr.decode("utf-8", errors="replace")
+        if "out of memory" in err.lower():
+            raise PandocError(tr(
+                "Pandoc exceeded the memory limit (4 GB). For large HTML documents, please use the MarkItDown tab."
+            ))
+        raise RuntimeError(f'Pandoc died with exitcode "{proc.returncode}": {err}')
+
+
 def _relativize_media_paths(output_path: str, media_dir: str) -> None:
     """Rewrite absolute image paths in the result as relative ones.
 
@@ -94,10 +168,9 @@ def _relativize_media_paths(output_path: str, media_dir: str) -> None:
 
 
 def _convert_via_chromium(input_path: str, output_path: str, opts: PandocOptions,
-                          say: Callable[[str], None]) -> None:
+                          say: Callable[[str], None],
+                          on_proc: Optional[Callable[[subprocess.Popen], None]] = None) -> None:
     """PDF via Chromium: pandoc makes a self-contained HTML, Chromium prints it."""
-    import pypandoc
-
     if not chromium.available():
         log.warning("Pandoc: Chromium/Playwright не установлен")
         raise PandocError(tr(
@@ -111,9 +184,9 @@ def _convert_via_chromium(input_path: str, output_path: str, opts: PandocOptions
         else:
             fd, tmp_html = tempfile.mkstemp(suffix=".html")
             os.close(fd)
-            pypandoc.convert_file(
-                input_path, "html", outputfile=tmp_html,
-                extra_args=["--standalone", "--embed-resources"],
+            _run_pandoc(
+                ["--to=html", input_path, f"--output={tmp_html}", "--standalone", "--embed-resources"],
+                on_proc=on_proc,
             )
             html_path = tmp_html
         say(tr("▶ PDF engine: {engine}").format(engine="Chromium"))
@@ -172,13 +245,13 @@ def _build_args(output_path: str, opts: PandocOptions,
 
 
 def convert(input_path: str, output_path: str, opts: PandocOptions,
-            say: Callable[[str], None] = lambda _m: None) -> None:
+            say: Callable[[str], None] = lambda _m: None,
+            on_proc: Optional[Callable[[subprocess.Popen], None]] = None) -> None:
     """Convert one file with Pandoc. Raises on failure.
 
     `say` receives progress lines meant for the user-visible log.
+    `on_proc` is notified of the running subprocess for cancellation.
     """
-    import pypandoc
-
     in_ext = Path(input_path).suffix.lower()
     size = os.path.getsize(input_path) if os.path.isfile(input_path) else -1
     log.info(
@@ -186,9 +259,13 @@ def convert(input_path: str, output_path: str, opts: PandocOptions,
         input_path, in_ext, size, opts.writer, output_path, opts.standalone,
     )
 
+    if in_ext in (".html", ".htm") and size > 30 * 1024 * 1024 and "markdown" in opts.writer:
+        say(tr("ℹ Note: Large HTML file ({size} MB). If conversion is slow or memory-heavy, the MarkItDown tab is recommended.").format(size=size // (1024 * 1024)))
+        log.warning("Pandoc: большой HTML файл (%d Б) при конвертации в Markdown", size)
+
     # Chromium takes a separate route: pandoc makes HTML, Chromium prints the PDF
     if opts.is_pdf and opts.pdf_engine == "chromium":
-        _convert_via_chromium(input_path, output_path, opts, say)
+        _convert_via_chromium(input_path, output_path, opts, say, on_proc=on_proc)
         log.info("Pandoc/Chromium: готово → %s", output_path)
         return
 
@@ -200,9 +277,10 @@ def convert(input_path: str, output_path: str, opts: PandocOptions,
         # otherwise the images don't render in common viewers
         writer = "markdown-link_attributes-raw_html"
 
-    log.debug("Pandoc: pypandoc.convert_file writer=%s extra_args=%s", writer, extra)
+    args = [f"--to={writer}", input_path, f"--output={output_path}"] + extra
+    log.debug("Pandoc: args=%s", args)
     try:
-        pypandoc.convert_file(input_path, writer, outputfile=output_path, extra_args=extra)
+        _run_pandoc(args, on_proc=on_proc)
     except Exception as e:
         msg = str(e)
         if opts.is_pdf and "package" in msg.lower():
