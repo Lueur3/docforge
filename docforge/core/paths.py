@@ -64,6 +64,11 @@ def find_bundled_pandoc() -> Path | None:
 def init_runtime_environment() -> None:
     """Early initialization of runtime paths and environment."""
     find_bundled_pandoc()
+    # Ensure Playwright finds browser binaries in frozen/standalone builds
+    if "PLAYWRIGHT_BROWSERS_PATH" not in os.environ:
+        local_app_data = os.getenv("LOCALAPPDATA", "")
+        if local_app_data:
+            os.environ["PLAYWRIGHT_BROWSERS_PATH"] = str(Path(local_app_data) / "ms-playwright")
 
 
 def unique_path(path: str | Path, taken: set[str] | None = None) -> Path:

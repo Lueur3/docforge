@@ -15,7 +15,8 @@ def available() -> bool:
         import playwright  # noqa: F401
     except ImportError:
         return False
-    base = Path(os.getenv("LOCALAPPDATA", "")) / "ms-playwright"
+    base_dir = os.environ.get("PLAYWRIGHT_BROWSERS_PATH")
+    base = Path(base_dir) if base_dir else Path(os.getenv("LOCALAPPDATA", "")) / "ms-playwright"
     return base.is_dir() and any(base.glob("chromium-*"))
 
 

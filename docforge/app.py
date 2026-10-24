@@ -9,6 +9,7 @@ from PyQt6.QtWidgets import QApplication
 
 from docforge import i18n
 from docforge.core.paths import get_resource_path, init_runtime_environment
+from docforge.core.single_instance import SingleInstanceServer, send_to_existing_instance
 from docforge.logging_setup import setup_logging
 from docforge.theme import apply_dark_theme
 from docforge.ui.setup_dialog import ensure_dependencies
@@ -32,6 +33,14 @@ def main() -> None:
     log_file = setup_logging()
     init_runtime_environment()
 
+    # files passed on the command line (Explorer context menu / SendTo)
+    incoming = [a for a in sys.argv[1:] if os.path.isfile(a)]
+
+    # Check if another DocForge instance is already running
+    if send_to_existing_instance(incoming):
+        # Forwarded files to running instance, exit immediately
+        sys.exit(0)
+
     # without this Windows shows the Python icon in the taskbar, not ours
     if sys.platform == "win32":
         import ctypes
@@ -48,12 +57,11 @@ def main() -> None:
     apply_dark_theme(app)
     ensure_dependencies(app)
 
-    # files passed on the command line (Explorer context menu / SendTo)
-    incoming = [a for a in sys.argv[1:] if os.path.isfile(a)]
     if incoming:
         log.info("Получено файлов из командной строки: %d", len(incoming))
 
     window = MainWindow(log_file)
+    single_server = SingleInstanceServer(window.load_files, window)
     if incoming:
         window.load_files(incoming)
     window.show()
@@ -62,4 +70,6 @@ def main() -> None:
     # wire pydub/ffmpeg up in the event loop right after showing window
     QTimer.singleShot(0, _deferred_init)
 
-    sys.exit(app.exec())
+    ret = app.exec()
+    single_server.close()
+    sys.exit(ret)
